@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#4F46E5</color>
+    <style name="Theme.Assistant" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#F8FAFC</item>
+    </style>
+</resources>
