@@ -59,6 +59,7 @@ object DeviceOwner {
         .sortedBy { it.name }
 
     private fun save(ctx: Context, list: List<BlockedApp>) {
+        // stored as "name\u0001pkg"; entries are unique per package (or per name when no package)
         prefs(ctx).edit().putStringSet("blocked", list.map { it.name + '\u0001' + (it.pkg ?: "") }.toSet()).apply()
     }
 
@@ -73,13 +74,85 @@ object DeviceOwner {
             ?: apps.firstOrNull { it.first.contains(q, true) }
     }
 
+    /** Popular apps: package → names the stores show, plus Arabic/English spellings people use. */
+    private val KNOWN = mapOf(
+        // Facebook / Meta
+        "com.facebook.katana" to listOf("Facebook", "فيسبوك", "فيس بوك", "فيس"),
+        "com.facebook.lite" to listOf("Facebook Lite", "فيسبوك لايت", "فيس لايت"),
+        "com.facebook.orca" to listOf("Messenger", "ماسنجر", "مسنجر"),
+        "com.instagram.android" to listOf("Instagram", "انستجرام", "إنستجرام", "انستا"),
+        "com.instagram.lite" to listOf("Instagram Lite", "انستجرام لايت", "انستا لايت"),
+        "com.instagram.barcelona" to listOf("Threads", "ثريدز"),
+        // TikTok
+        "com.zhiliaoapp.musically" to listOf("TikTok", "تيك توك", "تيكتوك"),
+        "com.ss.android.ugc.trill" to listOf("TikTok", "تيك توك"),
+        "com.zhiliaoapp.musically.go" to listOf("TikTok Lite", "تيك توك لايت", "تيكتوك لايت"),
+        "com.ss.android.ugc.tiktok.lite" to listOf("TikTok Lite", "تيك توك لايت"),
+        // Others
+        "com.snapchat.android" to listOf("Snapchat", "سناب شات", "سناب"),
+        "com.anghami" to listOf("Anghami", "أنغامي", "انغامي"),
+        "com.spotify.music" to listOf("Spotify", "سبوتيفاي", "سبوتفاي"),
+        "com.spotify.lite" to listOf("Spotify Lite", "سبوتيفاي لايت"),
+        // Live streaming (Bigo Live and the like)
+        "sg.bigo.live" to listOf("BIGO LIVE", "Bigo Live", "بيجو لايف", "بيجو"),
+        "sg.bigo.live.lite" to listOf("BIGO LIVE Lite", "Bigo Live Lite", "بيجو لايف لايت"),
+        "video.like" to listOf("Likee", "لايكي"),
+        "video.like.lite" to listOf("Likee Lite", "لايكي لايت"),
+        "com.sgiggle.production" to listOf("Tango", "Tango Live", "تانجو"),
+        "com.asiainno.uplive" to listOf("Uplive", "أب لايف", "اب لايف"),
+        "com.cmcm.live" to listOf("LiveMe", "Live.me", "لايف مي"),
+        "com.mico" to listOf("MICO", "ميكو"),
+        "com.yy.hiyo" to listOf("Hago", "هاجو"),
+        // Not requested but common
+        "com.twitter.android" to listOf("X", "Twitter", "تويتر"),
+        "com.google.android.youtube" to listOf("YouTube", "يوتيوب"),
+        "org.telegram.messenger" to listOf("Telegram", "تيليجرام", "تليجرام"),
+        "com.tencent.ig" to listOf("PUBG MOBILE", "ببجي", "PUBG"),
+    )
+
+    /** Live-streaming apps found only by their store name (package not known for sure). */
+    private val LIVE_NAMES = listOf("StreamKar", "Poppo Live", "BuzzCast", "Soulchill", "Kumu", "Ligo", "Yalla Live", "Chamet", "Tumile", "MeYo")
+
+    /** The user's own list (blocked from the first run of this version). */
+    private val DEFAULT_BLOCKED = listOf(
+        "com.facebook.katana", "com.facebook.lite",
+        "com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.zhiliaoapp.musically.go", "com.ss.android.ugc.tiktok.lite",
+        "com.snapchat.android", "com.instagram.android", "com.instagram.lite", "com.instagram.barcelona",
+        "com.anghami", "com.spotify.music", "com.spotify.lite",
+        "sg.bigo.live", "sg.bigo.live.lite", "video.like", "video.like.lite", "com.sgiggle.production",
+        "com.asiainno.uplive", "com.cmcm.live", "com.mico", "com.yy.hiyo",
+    )
+
+    /** Adds the default list once (keeps anything the user unblocked later unblocked). */
+    fun seedDefaults(ctx: Context) {
+        if (prefs(ctx).getBoolean("seeded_v1", false)) return
+        val have = blocked(ctx)
+        val add = DEFAULT_BLOCKED.filter { p -> have.none { it.pkg == p } }.map { BlockedApp(KNOWN[it]?.first() ?: it, it) } +
+            LIVE_NAMES.filter { n -> have.none { it.name.equals(n, true) } }.map { BlockedApp(it, null) }
+        // Two TikTok packages share a name: keep the name unique per package.
+        save(ctx, (have + add).distinctBy { it.pkg ?: it.name })
+        prefs(ctx).edit().putBoolean("seeded_v1", true).apply()
+        enforce(ctx)
+    }
+
+    private fun norm(s: String) = s.trim().lowercase().replace("إ", "ا").replace("أ", "ا").replace(" ", "")
+
+    private fun knownPkg(name: String): String? = KNOWN.entries.firstOrNull { e -> e.value.any { norm(it) == norm(name) } }?.key
+
+    /** All names to look for on store screens for this blocked app (store title first). */
+    fun storeNames(b: BlockedApp): List<String> =
+        (((b.pkg ?: knownPkg(b.name))?.let { KNOWN[it] }.orEmpty()) + b.name).filter { it.length >= 2 }.distinct()
+
+    /** What the last store-screen check saw (shown in Settings to help debugging). */
+    @Volatile var lastStoreCheck: String = ""
+
     /** Adds an app to the block list and removes it now if it's installed. Returns what happened. */
     fun block(ctx: Context, nameOrPkg: String, pkgHint: String? = null): String {
-        val found = findInstalled(ctx, pkgHint ?: nameOrPkg)
-        val pkg = pkgHint?.takeIf { it.contains('.') } ?: found?.second ?: nameOrPkg.takeIf { it.contains('.') && ' ' !in it }
+        val found = findInstalled(ctx, pkgHint ?: nameOrPkg) ?: knownPkg(nameOrPkg)?.let { findInstalled(ctx, it) }
+        val pkg = pkgHint?.takeIf { it.contains('.') } ?: found?.second ?: knownPkg(nameOrPkg) ?: nameOrPkg.takeIf { it.contains('.') && ' ' !in it }
         if (pkg == ctx.packageName) return "مينفعش أمنع نفسي 🙂"
-        val name = found?.first ?: nameOrPkg.trim()
-        val list = blocked(ctx).filterNot { it.name.equals(name, true) || (pkg != null && it.pkg == pkg) } + BlockedApp(name, pkg)
+        val name = found?.first ?: pkg?.let { KNOWN[it]?.first() } ?: nameOrPkg.trim()
+        val list = blocked(ctx).filterNot { if (pkg != null) it.pkg == pkg else it.name.equals(name, true) } + BlockedApp(name, pkg)
         save(ctx, list)
         val removed = if (pkg != null && installed(ctx, pkg)) remove(ctx, pkg) else null
         return buildString {
@@ -96,7 +169,7 @@ object DeviceOwner {
         if (!checkPin(ctx, pin)) return "❌ الرقم السري غلط"
         val q = nameOrPkg.trim()
         val before = blocked(ctx)
-        val after = before.filterNot { it.name.equals(q, true) || it.pkg.equals(q, true) || it.name.contains(q, true) }
+        val after = before.filterNot { it.name.equals(q, true) || it.pkg.equals(q, true) || it.name.contains(q, true) || (knownPkg(q) != null && it.pkg == knownPkg(q)) }
         if (after.size == before.size) return "مش لاقي \"$q\" في الممنوعين"
         save(ctx, after)
         (before - after.toSet()).mapNotNull { it.pkg }.forEach { p ->
@@ -138,14 +211,68 @@ object DeviceOwner {
     /** Checks every blocked package and removes any that is installed. */
     fun enforce(ctx: Context) {
         blocked(ctx).mapNotNull { it.pkg }.filter { installed(ctx, it) }.forEach { remove(ctx, it) }
+        if (browsersOnly(ctx)) forbiddenBrowsers(ctx).forEach { remove(ctx, it) }
     }
+
+    // ---------- browsers: only Chrome, Edge and the phone's own ----------
+
+    /** Browsers that stay allowed besides the phone's built-in (system) ones. */
+    private val ALLOWED_BROWSERS = setOf("com.android.chrome", "com.microsoft.emmx", "com.google.android.googlequicksearchbox")
+
+    /** Store names of other browsers, so their install button gets covered in the store. */
+    private val BROWSER_NAMES = listOf(
+        "Firefox", "Firefox Focus", "Firefox Nightly", "Firefox Beta", "Opera", "Opera Mini", "Opera GX", "Opera Touch",
+        "Brave", "DuckDuckGo", "Samsung Internet", "UC Browser", "UC Mini", "Vivaldi", "Tor Browser", "Yandex", "Yandex Browser",
+        "Kiwi Browser", "Mi Browser", "Puffin", "Dolphin", "Via Browser", "Ecosia", "Aloha", "Phoenix Browser", "Mint Browser",
+        "Chrome Beta", "Chrome Dev", "Chrome Canary", "Edge Beta", "Edge Dev", "Edge Canary", "Mull", "Cromite", "Bromite",
+        "Hermit", "Lemur Browser", "Quetta", "Maxthon", "Avast Secure Browser", "AVG Secure Browser", "Aloha Browser",
+    )
+
+    fun browsersOnly(ctx: Context) = prefs(ctx).getBoolean("browsers_only", true)
+
+    fun setBrowsersOnly(ctx: Context, on: Boolean, pin: String): Boolean {
+        if (!on && !checkPin(ctx, pin)) return false
+        prefs(ctx).edit().putBoolean("browsers_only", on).apply()
+        if (on) enforce(ctx)
+        return true
+    }
+
+    /** Apps that can open any web link = browsers. */
+    private fun browserPackages(ctx: Context): Set<String> = runCatching {
+        val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://nova-browser-check.invalid/")).addCategory(Intent.CATEGORY_BROWSABLE)
+        ctx.packageManager.queryIntentActivities(i, PackageManager.MATCH_ALL).map { it.activityInfo.packageName }.toSet()
+    }.getOrDefault(emptySet())
+
+    private fun isSystemApp(ctx: Context, pkg: String) = runCatching {
+        val f = ctx.packageManager.getApplicationInfo(pkg, 0).flags
+        f and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 || f and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
+    }.getOrDefault(true)
+
+    fun isForbiddenBrowser(ctx: Context, pkg: String): Boolean =
+        pkg != ctx.packageName && pkg !in ALLOWED_BROWSERS && !isSystemApp(ctx, pkg) && pkg in browserPackages(ctx)
+
+    fun forbiddenBrowsers(ctx: Context) = browserPackages(ctx).filter { isForbiddenBrowser(ctx, it) }
+
+    /** Names that also match store titles that only start with them ("Firefox Fast & Private Browser"). */
+    fun isPrefixName(name: String) = BROWSER_NAMES.any { it.equals(name, true) }
+
+    /** What the store guard looks for: the block list + other browsers when that rule is on. */
+    fun storeBlocked(ctx: Context): List<BlockedApp> =
+        blocked(ctx) + if (browsersOnly(ctx)) BROWSER_NAMES.map { BlockedApp(it, null) } else emptyList()
 
     /** Called when an app gets installed. */
     fun onInstalled(ctx: Context, pkg: String) {
+        if (browsersOnly(ctx) && isForbiddenBrowser(ctx, pkg)) {
+            remove(ctx, pkg)
+            ContextCompat.getMainExecutor(ctx).execute {
+                Toast.makeText(ctx, "🚫 مسموح بس Chrome وEdge ومتصفح الموبايل — اتشال", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         val pm = ctx.packageManager
         val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrNull()
         val list = blocked(ctx)
-        val hit = list.firstOrNull { it.pkg == pkg || (label != null && it.pkg == null && label.equals(it.name, true)) } ?: return
+        val hit = list.firstOrNull { it.pkg == pkg || (it.pkg == null && ((label != null && label.equals(it.name, true)) || knownPkg(it.name) == pkg)) } ?: return
         if (hit.pkg == null) save(ctx, list - hit + hit.copy(pkg = pkg)) // learn the package for next time
         remove(ctx, pkg)
         ContextCompat.getMainExecutor(ctx).execute { Toast.makeText(ctx, "🚫 ${hit.name} ممنوع — اتشال", Toast.LENGTH_LONG).show() }

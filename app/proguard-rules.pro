@@ -19,6 +19,3 @@
 -dontwarn javax.activation.**
 -dontwarn myjava.awt.datatransfer.**
 
-# osmdroid (maps)
--dontwarn org.osmdroid.**
--keep class org.osmdroid.** { *; }

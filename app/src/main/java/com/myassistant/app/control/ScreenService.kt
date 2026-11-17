@@ -78,7 +78,7 @@ class ScreenService : AccessibilityService() {
                         val p = r?.packageName?.toString()
                         if (r != null && p != null && p in com.myassistant.app.admin.DeviceOwner.STORE_PKGS) {
                             lastGuardAt = SystemClock.uptimeMillis()
-                            storeGuard(r, com.myassistant.app.admin.DeviceOwner.blocked(this))
+                            storeGuard(r, com.myassistant.app.admin.DeviceOwner.storeBlocked(this))
                         }
                     }
                 }, 350)
@@ -126,7 +126,7 @@ class ScreenService : AccessibilityService() {
             return
         }
 
-        val blockedApps = com.myassistant.app.admin.DeviceOwner.blocked(this)
+        val blockedApps = com.myassistant.app.admin.DeviceOwner.storeBlocked(this)
         if (blockedApps.isEmpty()) { clearCovers(); return }
 
         // 3) The system installer (APK files): just leave it.
@@ -156,14 +156,22 @@ class ScreenService : AccessibilityService() {
         words.flatMap { w -> root.findAccessibilityNodeInfosByText(w).filter { nodeLabel(it).equals(w, true) } }
             .distinctBy { val r = Rect(); it.getBoundsInScreen(r); r.toShortString() }
 
-    /** Smallest ancestor (within a few levels) whose subtree shows the blocked app's name, if it's "its" card/page. */
-    private fun ownerCard(btn: AccessibilityNodeInfo, name: String): AccessibilityNodeInfo? {
+    private fun isTitle(label: String, name: String) =
+        label.equals(name, true) || listOf(":", " -", " –", " |", " (").any { label.startsWith(name + it, true) } ||
+            (com.myassistant.app.admin.DeviceOwner.isPrefixName(name) && label.startsWith("$name ", true) &&
+                (label.contains("brows", true) || label.contains("متصفح") || label.contains("web", true)))
+
+    /**
+     * The card/page a button belongs to: climb up from the button until a parent also shows the blocked app's name.
+     * If on the way the parent already holds more than 2 install buttons, the button belongs to some other app.
+     */
+    private fun ownerCard(btn: AccessibilityNodeInfo, names: List<String>): AccessibilityNodeInfo? {
         var n: AccessibilityNodeInfo? = btn.parent
-        var depth = 0
-        while (n != null && depth < 10) {
-            val hasName = n.findAccessibilityNodeInfosByText(name).any { nodeLabel(it).equals(name, true) || nodeLabel(it).startsWith("$name:", true) || nodeLabel(it).startsWith("$name -", true) }
-            if (hasName) return if (exact(n, installWords).size <= 2) n else null
-            n = n.parent; depth++
+        while (n != null) {
+            if (exact(n, installWords).size > 2) return null
+            val hasName = names.any { name -> n!!.findAccessibilityNodeInfosByText(name).any { isTitle(nodeLabel(it), name) } }
+            if (hasName) return n
+            n = n.parent
         }
         return null
     }
@@ -173,21 +181,29 @@ class ScreenService : AccessibilityService() {
         val cancels = exact(root, cancelWords)
         val toCover = ArrayList<Rect>()
         var hitName: String? = null
+        val seen = ArrayList<String>()
         for (b in blocked) {
-            if (b.name.length < 3) continue
+            val names = com.myassistant.app.admin.DeviceOwner.storeNames(b)
+            val onScreen = names.filter { name -> root.findAccessibilityNodeInfosByText(name).any { isTitle(nodeLabel(it), name) } }
+            if (onScreen.isEmpty()) continue
+            seen += b.name
             for (btn in buttons) {
-                ownerCard(btn, b.name) ?: continue
+                ownerCard(btn, onScreen) ?: continue
                 val r = Rect(); btn.getBoundsInScreen(r)
                 if (r.width() > 0 && r.height() > 0) { toCover += r; hitName = b.name }
             }
             // A download already started: press its Cancel.
             for (c in cancels) {
-                if (ownerCard(c, b.name) != null) {
+                if (ownerCard(c, onScreen) != null) {
                     val target = generateSequence(c) { it.parent }.take(3).firstOrNull { it.isClickable }
                     if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) toast("🚫 ${b.name} ممنوع — لغيت التحميل")
                 }
             }
         }
+        com.myassistant.app.admin.DeviceOwner.lastStoreCheck =
+            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date()) +
+                " · ${root.packageName} · أزرار تثبيت: ${buttons.size} (${buttons.joinToString { nodeLabel(it) }})" +
+                " · ممنوع ظاهر: ${seen.ifEmpty { listOf("لا") }.joinToString()} · اتغطى: ${toCover.size}"
         handler.post { showCovers(toCover, hitName) }
     }
 

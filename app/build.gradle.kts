@@ -89,7 +89,6 @@ dependencies {
     implementation("com.sun.mail:android-mail:1.6.7")
     implementation("com.sun.mail:android-activation:1.6.7")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     testImplementation("junit:junit:4.13.2")
     // Desktop ONNX Runtime so CI can check the on-device model code on a normal computer.

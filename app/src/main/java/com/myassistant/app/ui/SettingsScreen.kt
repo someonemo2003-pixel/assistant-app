@@ -121,7 +121,7 @@ fun SettingsScreen(vm: AppViewModel) {
                             vm.lightTracking,
                         ) { vm.changeLightTracking(it) }
                         Row {
-                            TextButton(onClick = { vm.openMap() }) { Text("🗺️ خريطتي") }
+                            TextButton(onClick = { vm.openMap() }) { Text("🗺️ مشواري في Maps") }
                             TextButton(onClick = { vm.toggleWalk() }) { Text(if (walking) "⏹ وقّف المشي" else "▶️ ابدأ تتبّع المشي") }
                             TextButton(onClick = { vm.clearPlaces() }) { Text("مسح السجل", color = MaterialTheme.colorScheme.error) }
                         }
@@ -741,13 +741,32 @@ private fun GuardCard() {
                 OutlinedTextField(newApp, { newApp = it }, placeholder = { Text("اسم برنامج تمنعه…") }, singleLine = true, modifier = Modifier.weight(1f))
                 TextButton(onClick = { msg = D.block(ctx, newApp); newApp = ""; tick++ }, enabled = newApp.isNotBlank()) { Text("امنع") }
             }
-            blocked.forEach { b ->
+            val browsersOnly = remember(tick) { D.browsersOnly(ctx) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("🌐 المتصفحات: Chrome وEdge واللي مع الموبايل بس", style = MaterialTheme.typography.bodyMedium)
+                    Text("أي متصفح تاني بيتمنع في المتجر، ولو اتسطب بيتشال", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = browsersOnly, onCheckedChange = { on ->
+                    if (on) { D.setBrowsersOnly(ctx, true, ""); tick++ } else pinFor = "browsers_off"
+                })
+            }
+            blocked.distinctBy { it.name.lowercase() }.forEach { b ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("🚫 ${b.name}", modifier = Modifier.weight(1f))
                     TextButton(onClick = { pinFor = "unblock:" + b.name }) { Text("شيل") }
                 }
             }
             msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            if (blocked.isNotEmpty()) {
+                val check = remember(tick) { D.lastStoreCheck }
+                Text(
+                    "آخر فحص للمتجر: " + check.ifEmpty { "لسه — افتح المتجر وارجع هنا" },
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { tick++ },
+                )
+            }
             Row {
                 TextButton(onClick = { pinFor = "setpin" }) { Text(if (D.hasPin(ctx)) "غيّر الرقم السري" else "حط رقم سري") }
                 if (owner) TextButton(onClick = { pinFor = "release" }) { Text("إلغاء مالك الجهاز", color = MaterialTheme.colorScheme.error) }
@@ -773,7 +792,7 @@ private fun GuardCard() {
         var new by remember(what) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { pinFor = null },
-            title = { Text(when { what == "setpin" -> "الرقم السري"; what == "release" -> "إلغاء مالك الجهاز"; else -> "شيل المنع" }) },
+            title = { Text(when { what == "setpin" -> "الرقم السري"; what == "release" -> "إلغاء مالك الجهاز"; what == "browsers_off" -> "السماح بكل المتصفحات"; else -> "شيل المنع" }) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (D.hasPin(ctx)) OutlinedTextField(old, { old = it }, label = { Text("الرقم الحالي") }, singleLine = true,
@@ -788,6 +807,7 @@ private fun GuardCard() {
                     msg = when {
                         what == "setpin" -> if (D.setPin(ctx, old, new)) "✅ اتحفظ" else "❌ الرقم الحالي غلط"
                         what == "release" -> if (D.release(ctx, old)) "تم إلغاء مالك الجهاز" else "❌ الرقم غلط"
+                        what == "browsers_off" -> if (D.setBrowsersOnly(ctx, false, old)) "✅ كل المتصفحات مسموحة" else "❌ الرقم غلط"
                         else -> D.unblock(ctx, what.removePrefix("unblock:"), old)
                     }
                     pinFor = null; tick++

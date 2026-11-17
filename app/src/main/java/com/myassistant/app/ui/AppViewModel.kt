@@ -23,7 +23,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, Map }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -56,21 +56,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var job: Job? = null
 
-    /** Map to show (set when the assistant calls show_route / stops a walk). */
-    var mapRequest by mutableStateOf<com.myassistant.app.health.MapRequest?>(null)
-
-    init {
-        viewModelScope.launch {
-            com.myassistant.app.health.MapRequests.request.collect { r ->
-                if (r != null) {
-                    mapRequest = r
-                    screen = Screen.Map
-                    com.myassistant.app.health.MapRequests.consume()
-                }
-            }
-        }
-    }
-
     val walking = com.myassistant.app.health.WalkService.running
     fun toggleWalk() {
         viewModelScope.launch {
@@ -89,7 +74,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { com.myassistant.app.health.ActivityStore.get(getApplication()).clearPlaces() }
         notice = "اتمسح سجل الأماكن"
     }
-    fun openMap() { mapRequest = null; screen = Screen.Map }
+    /** Opens today's path in Google Maps. */
+    fun openMap() {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val start = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0)
+            }.timeInMillis
+            val pts = withContext(Dispatchers.IO) {
+                com.myassistant.app.health.ActivityStore.get(ctx).points(start, System.currentTimeMillis())
+            }
+            if (pts.isEmpty()) notice = "مفيش أماكن متسجلة النهارده — فعّل تسجيل الأماكن من الإعدادات"
+            else com.myassistant.app.health.GoogleMaps.openRoute(ctx, pts,
+                if (com.myassistant.app.health.ActivityStore.distance(pts) > 5_000) "driving" else "walking")
+        }
+    }
 
     // ---- Voice ----
 

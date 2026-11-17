@@ -9,25 +9,12 @@ import com.myassistant.app.tools.Tool
 import com.myassistant.app.tools.ToolContext
 import com.myassistant.app.tools.str
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-/** What the map screen should show (set by the show_route tool, read by the UI). */
-data class MapRequest(val from: Long, val to: Long, val walkId: Long?, val title: String)
-
-object MapRequests {
-    private val _request = MutableStateFlow<MapRequest?>(null)
-    val request: StateFlow<MapRequest?> = _request.asStateFlow()
-    fun show(r: MapRequest) { _request.value = r }
-    fun consume() { _request.value = null }
-}
 
 private fun dayStart(offsetDays: Int): Long = Calendar.getInstance().apply {
     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -96,9 +83,11 @@ class WalkTool : Tool {
                 kotlinx.coroutines.delay(800)
                 val w = withContext(Dispatchers.IO) { ActivityStore.get(ctx.app).walks(5).firstOrNull { it.id == id } }
                 if (w != null) {
-                    MapRequests.show(MapRequest(w.start, w.end ?: System.currentTimeMillis(), w.id, "المشوار"))
+                    val pts = withContext(Dispatchers.IO) { ActivityStore.get(ctx.app).points(0, 0, w.id) }
+                    val shown = GoogleMaps.openRoute(ctx.app, pts)
                     "Walk saved: ${String.format(Locale.US, "%.2f", w.meters / 1000)} km, ${w.steps} steps, " +
-                        "${((w.end ?: System.currentTimeMillis()) - w.start) / 60000} min. The map is now shown to the user."
+                        "${((w.end ?: System.currentTimeMillis()) - w.start) / 60000} min." +
+                        if (shown) " The route is now open in Google Maps." else ""
                 } else "Walk stopped"
             }
         }
@@ -110,7 +99,7 @@ class ShowRouteTool : Tool {
     override val name = "show_route"
     override val title = "خريطة"
     override val description =
-        "Show the user a map of where they went: a day (today/yesterday/yyyy-MM-dd), optionally a time window, or the last tracked walk."
+        "Open Google Maps with the route the user went: a day (today/yesterday/yyyy-MM-dd), optionally a time window, or the last tracked walk."
     override val parameters = Schema.obj(
         "day" to Schema.string("today | yesterday | yyyy-MM-dd | last_walk"),
         "from_hour" to Schema.integer("Optional start hour 0-23"),
@@ -121,8 +110,9 @@ class ShowRouteTool : Tool {
         val store = ActivityStore.get(ctx.app)
         if (args.str("day") == "last_walk") {
             val w = withContext(Dispatchers.IO) { store.walks(1).firstOrNull() } ?: return "No tracked walks yet"
-            MapRequests.show(MapRequest(w.start, w.end ?: System.currentTimeMillis(), w.id, "آخر مشوار"))
-            return "Showing the last walk on the map (${String.format(Locale.US, "%.2f", w.meters / 1000)} km)."
+            val pts = withContext(Dispatchers.IO) { store.points(0, 0, w.id) }
+            if (!GoogleMaps.openRoute(ctx.app, pts)) return "That walk has no saved points"
+            return "Opened the last walk in Google Maps (${String.format(Locale.US, "%.2f", w.meters / 1000)} km)."
         }
         var (from, to) = dayRange(args.str("day")) ?: return "Bad day; use today, yesterday or yyyy-MM-dd"
         val dayBegin = from
@@ -130,8 +120,8 @@ class ShowRouteTool : Tool {
         if (args.has("to_hour")) to = dayBegin + args.optInt("to_hour") * 3_600_000L
         val pts = withContext(Dispatchers.IO) { store.points(from, to) }
         if (pts.isEmpty()) return "No location history for that time (all-day tracking may be off or 'allow all the time' location not granted)."
-        MapRequests.show(MapRequest(from, to, null, args.str("day").ifEmpty { "النهارده" }))
-        return "Showing the map: ${pts.size} points, ≈ ${String.format(Locale.US, "%.1f", ActivityStore.distance(pts) / 1000)} km moved."
+        GoogleMaps.openRoute(ctx.app, pts, if (ActivityStore.distance(pts) > 5_000) "driving" else "walking")
+        return "Opened the route in Google Maps: ${pts.size} points, ≈ ${String.format(Locale.US, "%.1f", ActivityStore.distance(pts) / 1000)} km moved."
     }
 }
 
@@ -180,5 +170,32 @@ class PlacesTool : Tool {
         if (g.last().time - g.first().time >= 10 * 60_000L) {
             out += Stay(g.first().time, g.last().time, g.map { it.lat }.average(), g.map { it.lng }.average())
         }
+    }
+}
+
+
+class NavigateTool : Tool {
+    override val name = "navigate"
+    override val title = "الطريق"
+    override val description =
+        "Open Google Maps with the way to a place from where the user is now (a name or address, e.g. 'Cairo Festival City' " +
+            "or a saved place's address). start=true begins turn-by-turn navigation right away."
+    override val parameters = Schema.obj(
+        "destination" to Schema.string("Place name or address"),
+        "mode" to Schema.string("driving | walking | transit | bicycling | two-wheeler (default driving)"),
+        "start" to Schema.string("'true' to start navigation now, else just show the route"),
+        required = listOf("destination"),
+    )
+    override val learnable = true
+
+    override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
+        val dest = args.str("destination").ifBlank { return "Missing destination" }
+        // A saved place ("البيت") → its coordinates.
+        val saved = withContext(Dispatchers.IO) {
+            com.myassistant.app.reminders.ReminderStore.get(ctx.app).places().firstOrNull { it.name.equals(dest.trim(), true) }
+        }
+        val target = saved?.let { String.format(Locale.US, "%.6f,%.6f", it.lat, it.lng) } ?: dest
+        val ok = GoogleMaps.directions(ctx.app, target, args.str("mode").ifBlank { "driving" }, args.str("start") == "true")
+        return if (ok) "Opened Google Maps to $dest" else "Couldn't open Google Maps"
     }
 }

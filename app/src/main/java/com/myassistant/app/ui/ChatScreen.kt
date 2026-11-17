@@ -6,6 +6,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,9 +39,12 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -64,12 +69,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.myassistant.app.core.Role
+import com.myassistant.app.ui.theme.NovaCyan
+import com.myassistant.app.ui.theme.NovaNight
+import com.myassistant.app.ui.theme.NovaPink
+import com.myassistant.app.ui.theme.NovaViolet
 import com.myassistant.app.ui.theme.UserBubble
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,32 +114,46 @@ fun ChatScreen(vm: AppViewModel) {
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size, vm.busy, vm.error) { listState.animateScrollToItem(0) }
 
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxSize()) {
+    NovaBackground()
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Nova", fontWeight = FontWeight.Bold)
-                        Text(
-                            if (readyCount > 0) "$readyCount مزوّد جاهز" else "محتاج مفتاح API — افتح الإعدادات",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Nova", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.size(8.dp))
+                        // green = ready, red = needs an API key
+                        Box(
+                            Modifier.size(7.dp).clip(CircleShape)
+                                .background(if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error),
                         )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { vm.screen = Screen.Settings }) { Icon(Icons.Filled.Settings, "الإعدادات") }
-                },
-                actions = {
-                    IconButton(onClick = { vm.screen = Screen.Chats }) { Icon(Icons.AutoMirrored.Filled.List, "المحادثات") }
-                    IconButton(onClick = { vm.screen = Screen.Memory }) { Icon(Icons.Filled.Star, "بياناتي") }
-                    if (vm.messages.isNotEmpty()) {
-                        IconButton(onClick = { vm.newChat() }) { Icon(Icons.Filled.Add, "محادثة جديدة") }
+                    IconButton(onClick = { vm.screen = Screen.Settings }) {
+                        Icon(Icons.Filled.Settings, "الإعدادات", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                actions = {
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Filled.MoreVert, "القايمة", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(text = { Text("محادثة جديدة") }, leadingIcon = { Icon(Icons.Filled.Add, null) },
+                                onClick = { menuOpen = false; vm.newChat() })
+                            DropdownMenuItem(text = { Text("المحادثات") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, null) },
+                                onClick = { menuOpen = false; vm.screen = Screen.Chats })
+                            DropdownMenuItem(text = { Text("بياناتي") }, leadingIcon = { Icon(Icons.Filled.AccountCircle, null) },
+                                onClick = { menuOpen = false; vm.screen = Screen.Memory })
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
             )
         },
         bottomBar = {
@@ -154,9 +179,12 @@ fun ChatScreen(vm: AppViewModel) {
                 value = input,
                 onValueChange = { input = it },
                 busy = vm.busy,
+                listening = listen.listening,
+                level = listen.level,
+                speaking = speaking,
                 onSend = { vm.send(input); input = "" },
                 onStop = { vm.stop() },
-                onMic = onMic,
+                onMic = { if (listen.listening || speaking) vm.stopVoice() else onMic() },
             )
             }
         },
@@ -164,7 +192,7 @@ fun ChatScreen(vm: AppViewModel) {
         if (vm.messages.isEmpty() && vm.error == null) {
             EmptyState(
                 modifier = Modifier.padding(padding),
-                onSuggestion = { vm.send(it) },
+                active = listen.listening || speaking || vm.busy,
                 needsKey = readyCount == 0,
                 openSettings = { vm.screen = Screen.Settings },
             )
@@ -188,31 +216,34 @@ fun ChatScreen(vm: AppViewModel) {
             }
         }
     }
+    }
 }
 
 @Composable
 private fun Bubble(text: String, mine: Boolean, footer: String? = null) {
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         val shape = RoundedCornerShape(
-            topStart = 20.dp, topEnd = 20.dp,
-            bottomStart = if (mine) 20.dp else 6.dp,
-            bottomEnd = if (mine) 6.dp else 20.dp,
+            topStart = 22.dp, topEnd = 22.dp,
+            bottomStart = if (mine) 22.dp else 6.dp,
+            bottomEnd = if (mine) 6.dp else 22.dp,
         )
-        Surface(
-            shape = shape,
-            color = if (mine) UserBubble else MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = if (mine) Color.White else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.widthIn(max = 320.dp),
+        val bg = if (mine) Modifier.background(Brush.linearGradient(listOf(Color(0xFF3B82F6), NovaViolet)), shape)
+        else Modifier
+            .background(Color.White.copy(alpha = 0.06f), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+        Column(
+            Modifier.widthIn(max = 320.dp).clip(shape).then(bg).padding(horizontal = 15.dp, vertical = 11.dp),
         ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                SelectionContainer { Text(text, style = MaterialTheme.typography.bodyLarge) }
-                if (footer != null) {
-                    Text(
-                        footer,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.alpha(0.55f).padding(top = 4.dp),
-                    )
-                }
+            SelectionContainer {
+                Text(text, style = MaterialTheme.typography.bodyLarge, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface)
+            }
+            if (footer != null) {
+                Text(
+                    footer,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.alpha(0.7f).padding(top = 4.dp),
+                )
             }
         }
     }
@@ -225,20 +256,21 @@ private fun ToolChip(title: String, result: String) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                .background(NovaCyan.copy(alpha = 0.08f))
+                .border(1.dp, NovaCyan.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .widthIn(max = 320.dp),
         ) {
             Icon(
                 Icons.Filled.Build, null,
-                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                tint = NovaCyan,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.size(6.dp))
             Text(
                 "$title · $result",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = NovaCyan.copy(alpha = 0.85f),
                 maxLines = 3,
             )
         }
@@ -266,7 +298,7 @@ private fun TypingIndicator() {
     Row(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(Color.White.copy(alpha = 0.06f))
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -281,7 +313,7 @@ private fun TypingIndicator() {
                     .size(8.dp)
                     .alpha(a)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(listOf(NovaCyan, NovaViolet, NovaPink)[i]),
             )
         }
     }
@@ -292,53 +324,120 @@ private fun InputBar(
     value: String,
     onValueChange: (String) -> Unit,
     busy: Boolean,
+    listening: Boolean,
+    level: Float,
+    speaking: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onMic: () -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            TextField(
-                value = value,
-                onValueChange = onValueChange,
-                placeholder = { Text("اكتب طلبك…") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp),
-                maxLines = 5,
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text("اكتب لـ Nova…", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp)),
+            shape = RoundedCornerShape(26.dp),
+            maxLines = 5,
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+                focusedContainerColor = Color.White.copy(alpha = 0.06f),
+                unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
+                cursorColor = NovaCyan,
+            ),
+        )
+        Spacer(Modifier.size(10.dp))
+        when {
+            busy -> RoundButton(onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = Color.White) }
+            value.isNotBlank() -> RoundButton(onSend) { Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = Color.White) }
+            // The Nova ring is the mic: tap to talk, it glows and moves with your voice.
+            else -> NovaRing(
+                size = 54.dp,
+                active = listening || speaking,
+                level = if (listening) level else if (speaking) 0.35f else 0f,
+                modifier = Modifier.clip(CircleShape).clickable(onClick = onMic),
             )
-            Spacer(Modifier.size(8.dp))
-            if (busy) {
-                FilledIconButton(onClick = onStop, modifier = Modifier.size(52.dp)) {
-                    Icon(Icons.Filled.Close, "إيقاف")
-                }
-            } else if (value.isBlank()) {
-                FilledIconButton(onClick = onMic, modifier = Modifier.size(52.dp)) {
-                    Icon(Icons.Filled.Mic, "اتكلم")
-                }
-            } else {
-                FilledIconButton(
-                    onClick = onSend,
-                    modifier = Modifier.size(52.dp),
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "إرسال")
-                }
-            }
         }
     }
+}
+
+@Composable
+private fun RoundButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .size(54.dp)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(NovaCyan, NovaViolet, NovaPink)))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+/** The glowing Nova ring: breathes when idle, turns and swells with the voice when active. */
+@Composable
+fun NovaRing(size: androidx.compose.ui.unit.Dp, active: Boolean, level: Float = 0f, modifier: Modifier = Modifier) {
+    val t = rememberInfiniteTransition(label = "ring")
+    val breathe by t.animateFloat(
+        initialValue = 0.94f, targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "breathe",
+    )
+    val spin by t.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(if (active) 2600 else 24000, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "spin",
+    )
+    val voice by androidx.compose.animation.core.animateFloatAsState(level.coerceIn(0f, 1f), label = "voice")
+    val scale = if (active) 1f + voice * 0.35f else breathe
+    val glow by androidx.compose.animation.core.animateFloatAsState(if (active) 1f else 0.55f, label = "glow")
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        // soft halo behind the ring
+        Box(
+            Modifier
+                .size(size)
+                .graphicsLayer { scaleX = scale * 1.15f; scaleY = scale * 1.15f; alpha = glow * 0.6f }
+                .background(Brush.radialGradient(listOf(NovaViolet.copy(alpha = 0.55f), Color.Transparent)), CircleShape),
+        )
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(com.myassistant.app.R.drawable.ic_launcher_art),
+            contentDescription = "اتكلم",
+            modifier = Modifier
+                .size(size)
+                .graphicsLayer { scaleX = scale * 1.25f; scaleY = scale * 1.25f; rotationZ = spin; alpha = 0.75f + glow * 0.25f },
+        )
+    }
+}
+
+/** Night sky behind the chat: deep navy with a violet glow on top and a cyan one at the bottom. */
+@Composable
+private fun NovaBackground() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(NovaNight)
+            .drawBehind {
+                drawCircle(
+                    Brush.radialGradient(listOf(NovaViolet.copy(alpha = 0.22f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, 0f), radius = size.width * 0.9f),
+                    radius = size.width * 0.9f, center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, 0f),
+                )
+                drawCircle(
+                    Brush.radialGradient(listOf(NovaCyan.copy(alpha = 0.10f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width, size.height), radius = size.width),
+                    radius = size.width, center = androidx.compose.ui.geometry.Offset(size.width, size.height),
+                )
+            },
+    )
 }
 
 /** Shows what the assistant is hearing, or that it is talking, with a button to stop. */
@@ -357,47 +456,29 @@ private fun VoiceBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
+            .background(Color.White.copy(alpha = 0.06f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val pulse by rememberInfiniteTransition(label = "mic").animateFloat(
-            initialValue = 0.85f, targetValue = 1.15f,
-            animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "pulse",
-        )
-        val scale = if (listening) (0.9f + level * 0.5f).coerceAtMost(1.4f) else pulse
-        Box(
-            Modifier
-                .size(36.dp * scale)
-                .clip(CircleShape)
-                .background(if (listening) UserBubble else MaterialTheme.colorScheme.tertiary),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (listening) Icons.Filled.Mic else Icons.AutoMirrored.Filled.VolumeUp, null,
-                tint = Color.White, modifier = Modifier.size(20.dp),
-            )
-        }
-        Spacer(Modifier.size(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 if (listening) "بسمعك…" else "بيتكلم…" + if (voiceMode) " (وبعدها هسمعك تاني)" else "",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = NovaCyan,
             )
             if (listening && partial.isNotEmpty()) {
-                Text(partial, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 3)
+                Text(partial, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 3)
             }
         }
-        IconButton(onClick = onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+        IconButton(onClick = onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Empty chat: just the glowing Nova ring, breathing. */
 @Composable
 private fun EmptyState(
     modifier: Modifier,
-    onSuggestion: (String) -> Unit,
+    active: Boolean,
     needsKey: Boolean,
     openSettings: () -> Unit,
 ) {
@@ -406,43 +487,10 @@ private fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            Modifier
-                .size(88.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
-                    ),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Star, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(40.dp))
-        }
-        Spacer(Modifier.height(20.dp))
-        Text("أهلاً! أنا مساعدك", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "اطلب أي حاجة بكلامك العادي — اكتب أو دوس 🎤 واتكلم",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
+        NovaRing(size = 200.dp, active = active)
         if (needsKey) {
-            SuggestionChip(onClick = openSettings, label = { Text("ابدأ: حط مفتاح Gemini المجاني") })
-        } else {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                listOf(
-                    "صحّيني بكرة الساعة 7 الصبح",
-                    "افتح يوتيوب",
-                    "اعمل مؤقت 10 دقايق",
-                    "افتكر إن عيد ميلاد أمي يوم 5 مارس",
-                ).forEach { s -> SuggestionChip(onClick = { onSuggestion(s) }, label = { Text(s) }) }
-            }
+            Spacer(Modifier.height(28.dp))
+            androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API من الإعدادات", color = NovaCyan) }
         }
     }
 }

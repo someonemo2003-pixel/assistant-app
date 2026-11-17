@@ -2,7 +2,7 @@
 <resources>
     <color name="brand">#4F46E5</color>
     <color name="icon_bg">#020123</color>
-    <style name="Theme.Assistant" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#F8FAFC</item>
+    <style name="Theme.Assistant" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#05041A</item>
     </style>
 </resources>

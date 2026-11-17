@@ -108,7 +108,7 @@ class AppGraph(context: Context) {
         com.myassistant.app.reminders.CancelReminderTool(), com.myassistant.app.reminders.SavePlaceTool(),
         com.myassistant.app.finance.ExpensesTool(),
         com.myassistant.app.health.StepsTool(), com.myassistant.app.health.WalkTool(),
-        com.myassistant.app.health.ShowRouteTool(), com.myassistant.app.health.PlacesTool(),
+        com.myassistant.app.health.ShowRouteTool(), com.myassistant.app.health.NavigateTool(), com.myassistant.app.health.PlacesTool(),
         ScreenTimeTool(), DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
     )
 
@@ -140,6 +140,7 @@ class AppGraph(context: Context) {
 
     fun startBackground() {
         runCatching { com.myassistant.app.mail.DailyReport.schedule(appContext) }
+        runCatching { com.myassistant.app.admin.DeviceOwner.seedDefaults(appContext) }
         runCatching { com.myassistant.app.admin.DeviceOwner.protectSelf(appContext); com.myassistant.app.admin.DeviceOwner.enforce(appContext) }
         runCatching { com.myassistant.app.focus.Focus.apply(appContext) }
         runCatching { com.myassistant.app.update.Updater.schedule(appContext) }
