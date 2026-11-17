@@ -40,6 +40,7 @@ import com.myassistant.app.tools.RecentCallsTool
 import com.myassistant.app.tools.SearchFilesTool
 import com.myassistant.app.tools.SendSmsTool
 import com.myassistant.app.tools.SetVolumeTool
+import com.myassistant.app.tools.ScreenTimeTool
 import com.myassistant.app.tools.OpenAppTool
 import com.myassistant.app.tools.RememberTool
 import com.myassistant.app.tools.SearchChatsTool
@@ -89,7 +90,7 @@ class AppGraph(context: Context) {
         ListEventsTool(), AddEventTool(), LocationTool(),
         ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
         // device
-        DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
+        ScreenTimeTool(), DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
     )
 
     val tools = ToolRegistry(

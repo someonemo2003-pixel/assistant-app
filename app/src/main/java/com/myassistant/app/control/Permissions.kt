@@ -74,6 +74,14 @@ object Permissions {
                 ),
             )
         }
+        add(
+            PermItem(
+                "usage", "📊 بيانات الاستخدام",
+                "وقت الشاشة وأكتر التطبيقات استخداماً (زي Digital Wellbeing) من غير ما يفتح حاجة.",
+                settingsIntent = { Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS) },
+                isGranted = { com.myassistant.app.tools.hasUsageAccess(it) },
+            ),
+        )
         runtime("contacts", "👥 جهات الاتصال", "يلاقي رقم أي حد بالاسم.", Manifest.permission.READ_CONTACTS)
         runtime("calls", "📞 المكالمات", "يتصل (بعد موافقتك) ويقرا سجل المكالمات.", Manifest.permission.CALL_PHONE, Manifest.permission.READ_CALL_LOG)
         runtime("sms", "💬 الرسايل SMS", "يبعت SMS (بعد موافقتك) ويقرا الرسايل.", Manifest.permission.SEND_SMS, Manifest.permission.READ_SMS)
