@@ -95,8 +95,8 @@ class Recall(
     }
 
     private companion object {
-        const val EXPERIENCE_MIN = 0.80f
-        const val EXPERIENCE_MARGIN = 0.04f
+        const val EXPERIENCE_MIN = 0.78f
+        const val EXPERIENCE_MARGIN = 0.06f
         const val MEMORY_MIN = 0.30f
         const val CHAT_MIN = 0.35f
     }
