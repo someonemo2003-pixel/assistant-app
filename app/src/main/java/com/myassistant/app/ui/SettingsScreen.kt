@@ -229,6 +229,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     onEdit = { editing = c },
                 )
             }
+            item { GuardCard() }
             item { BackupCard(vm) }
             item {
                 OutlinedButton(
@@ -708,6 +709,89 @@ private fun BackupCard(vm: AppViewModel) {
                 }) { Text("استرجع") }
             },
             dismissButton = { TextButton(onClick = { pending = null }) { Text("إلغاء") } },
+        )
+    }
+}
+
+
+/** 🛡️ Full control: block apps, PIN, device owner status and how to turn it on. */
+@Composable
+private fun GuardCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    val D = com.myassistant.app.admin.DeviceOwner
+    var tick by remember { mutableStateOf(0) }
+    val owner = remember(tick) { D.isOwner(ctx) }
+    val blocked = remember(tick) { D.blocked(ctx) }
+    var newApp by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf<String?>(null) }
+    var pinFor by remember { mutableStateOf<String?>(null) } // "unblock:<name>" | "setpin" | "release"
+    var showSteps by remember { mutableStateOf(false) }
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("🛡️ التحكم الكامل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                if (owner) "✅ مالك الجهاز شغال: المنع من النظام نفسه، ومساعدي مايتمسحش." else "⚪ مالك الجهاز مش مفعّل — المنع شغال بالتحكم في الشاشة بس.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(newApp, { newApp = it }, placeholder = { Text("اسم برنامج تمنعه…") }, singleLine = true, modifier = Modifier.weight(1f))
+                TextButton(onClick = { msg = D.block(ctx, newApp); newApp = ""; tick++ }, enabled = newApp.isNotBlank()) { Text("امنع") }
+            }
+            blocked.forEach { b ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🚫 ${b.name}", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { pinFor = "unblock:" + b.name }) { Text("شيل") }
+                }
+            }
+            msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Row {
+                TextButton(onClick = { pinFor = "setpin" }) { Text(if (D.hasPin(ctx)) "غيّر الرقم السري" else "حط رقم سري") }
+                if (owner) TextButton(onClick = { pinFor = "release" }) { Text("إلغاء مالك الجهاز", color = MaterialTheme.colorScheme.error) }
+                else TextButton(onClick = { showSteps = !showSteps }) { Text("إزاي أفعّل مالك الجهاز؟") }
+            }
+            if (showSteps && !owner) {
+                Text(
+                    "1) خد باك أب للواتس التوأم (إعدادات واتساب ← الدردشات ← نسخ احتياطي) وبعدين اقفل App Twin.\n" +
+                        "2) الإعدادات ← المستخدمين والحسابات: شيل كل الحسابات (جوجل، Honor ID، وأي حساب تاني) مؤقتاً.\n" +
+                        "3) فعّل خيارات المطوّر وتصحيح USB، ووصّل الموبايل باللابتوب.\n" +
+                        "4) على اللابتوب نزّل Platform-Tools من جوجل، وافتح الترمينال في الفولدر واكتب الأمر ده:",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(D.ADB_COMMAND, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(D.ADB_COMMAND)) }) { Text("📋 انسخ الأمر") }
+                Text("5) لما يقول Success رجّع حساباتك والـ Twin، وارجع هنا تلاقيها ✅.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+
+    pinFor?.let { what ->
+        var old by remember(what) { mutableStateOf("") }
+        var new by remember(what) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { pinFor = null },
+            title = { Text(when { what == "setpin" -> "الرقم السري"; what == "release" -> "إلغاء مالك الجهاز"; else -> "شيل المنع" }) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (D.hasPin(ctx)) OutlinedTextField(old, { old = it }, label = { Text("الرقم الحالي") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                    if (what == "setpin") OutlinedTextField(new, { new = it }, label = { Text("الرقم الجديد (فاضي = من غير رقم)") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                    if (what == "release") Text("هترجع للمنع بالتحكم في الشاشة بس، ومساعدي هيبقى ينفع يتمسح.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    msg = when {
+                        what == "setpin" -> if (D.setPin(ctx, old, new)) "✅ اتحفظ" else "❌ الرقم الحالي غلط"
+                        what == "release" -> if (D.release(ctx, old)) "تم إلغاء مالك الجهاز" else "❌ الرقم غلط"
+                        else -> D.unblock(ctx, what.removePrefix("unblock:"), old)
+                    }
+                    pinFor = null; tick++
+                }) { Text("تمام") }
+            },
+            dismissButton = { TextButton(onClick = { pinFor = null }) { Text("إلغاء") } },
         )
     }
 }

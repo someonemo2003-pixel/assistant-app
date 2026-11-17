@@ -94,6 +94,8 @@ class AppGraph(context: Context) {
         // screen control
         ReadScreenTool(), DoStepsTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(), RunRecipeTool(),
         // phone data
+        com.myassistant.app.admin.BlockAppTool(), com.myassistant.app.admin.UnblockAppTool(), com.myassistant.app.admin.ListBlockedTool(),
+        com.myassistant.app.admin.SuspendAppTool(), com.myassistant.app.admin.LockPhoneTool(),
         ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), com.myassistant.app.control.SendWhatsAppTool(), ClearNotificationsTool(), NotificationAlertTool(),
         FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
         ListEventsTool(), AddEventTool(), LocationTool(),
@@ -137,6 +139,7 @@ class AppGraph(context: Context) {
 
     fun startBackground() {
         runCatching { com.myassistant.app.mail.DailyReport.schedule(appContext) }
+        runCatching { com.myassistant.app.admin.DeviceOwner.protectSelf(appContext); com.myassistant.app.admin.DeviceOwner.enforce(appContext) }
         runCatching { com.myassistant.app.health.Health.schedule(appContext) }
         appScope.launch { runCatching { com.myassistant.app.health.Health.sampleSteps(appContext) } }
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) {

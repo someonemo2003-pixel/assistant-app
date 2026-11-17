@@ -23,14 +23,80 @@ class ScreenService : AccessibilityService() {
     /** Elements from the last screen read, so the AI can refer to them by number. */
     private var lastElements: List<AccessibilityNodeInfo> = emptyList()
 
+    private var installWatcher: android.content.BroadcastReceiver? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = WeakReference(this)
+        installWatcher = runCatching { com.myassistant.app.admin.DeviceOwner.registerInstallWatcher(this) }.getOrNull()
+        runCatching { com.myassistant.app.admin.DeviceOwner.enforce(applicationContext) }
     }
 
     override fun onDestroy() {
         if (instance?.get() === this) instance = null
+        installWatcher?.let { runCatching { unregisterReceiver(it) } }
         super.onDestroy()
+    }
+
+    private var lastGuardAt = 0L
+
+    /** Blocked apps: leave their store/installer page; confirm uninstalls we asked for; protect ourselves. */
+    private fun guard(event: AccessibilityEvent) {
+        val pkg = event.packageName?.toString() ?: return
+        val isStore = pkg in com.myassistant.app.admin.DeviceOwner.STORE_PKGS || "packageinstaller" in pkg || "permissioncontroller" in pkg
+        if (!isStore) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastGuardAt < 350) return
+        lastGuardAt = now
+        val root = rootInActiveWindow ?: return
+        val texts = ArrayList<String>()
+        fun walk(n: AccessibilityNodeInfo?, depth: Int) {
+            if (n == null || depth > 25 || texts.size > 400) return
+            n.text?.let { texts += it.toString() }
+            n.contentDescription?.let { texts += it.toString() }
+            for (i in 0 until n.childCount) walk(n.getChild(i), depth + 1)
+        }
+        walk(root, 0)
+        val all = texts.joinToString("\n")
+
+        // 1) An uninstall we started (blocked app): press the confirm button.
+        val pending = com.myassistant.app.admin.DeviceOwner.pendingUninstall
+        if (pending != null && ("packageinstaller" in pkg || "permissioncontroller" in pkg)) {
+            val ok = listOf("OK", "موافق", "حسنًا", "حسناً", "إلغاء التثبيت", "Uninstall", "حذف", "إزالة")
+            for (w in ok) {
+                val btn = root.findAccessibilityNodeInfosByText(w).firstOrNull { it.isClickable && it.className?.contains("Button") == true }
+                if (btn != null) {
+                    btn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    com.myassistant.app.admin.DeviceOwner.pendingUninstall = null
+                    return
+                }
+            }
+            return
+        }
+
+        // 2) Someone trying to uninstall the assistant while a PIN is set.
+        if (("packageinstaller" in pkg || "permissioncontroller" in pkg) && com.myassistant.app.admin.DeviceOwner.hasPin(this) &&
+            all.contains("مساعدي") && Regex("إلغاء التثبيت|uninstall|حذف التطبيق|إزالة التطبيق|إلغاء تثبيت", RegexOption.IGNORE_CASE).containsMatchIn(all)
+        ) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            toast("🔒 مساعدي محمي — شيل الحماية من الإعدادات بالرقم السري")
+            return
+        }
+
+        // 3) A blocked app's page in the store or its installer.
+        val hit = com.myassistant.app.admin.DeviceOwner.blocked(this).firstOrNull { b ->
+            (b.name.length >= 3 && all.contains(b.name, ignoreCase = true)) || (b.pkg != null && all.contains(b.pkg))
+        } ?: return
+        // In stores, only act on pages that offer to install it (not every list that mentions the name).
+        val installer = "packageinstaller" in pkg
+        if (!installer && !Regex("تثبيت|تنزيل|Install|Get|Download|تحديث|Update", RegexOption.IGNORE_CASE).containsMatchIn(all)) return
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        toast("🚫 ${hit.name} ممنوع على الموبايل ده")
+    }
+
+    private fun toast(t: String) = android.os.Handler(mainLooper).post {
+        android.widget.Toast.makeText(this, t, android.widget.Toast.LENGTH_LONG).show()
     }
 
     /** Time of the last UI change anywhere on screen (used to know when the screen has settled). */
@@ -38,6 +104,7 @@ class ScreenService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         lastEventAt = SystemClock.uptimeMillis()
+        if (event != null) runCatching { guard(event) }
     }
 
     /** Waits until the screen stops changing (much faster than a fixed delay). */

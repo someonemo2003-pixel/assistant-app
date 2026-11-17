@@ -1,0 +1,210 @@
+package com.myassistant.app.admin
+
+import android.app.PendingIntent
+import android.app.admin.DeviceAdminReceiver
+import android.app.admin.DevicePolicyManager
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.core.content.ContextCompat
+import java.security.MessageDigest
+
+/** Needed for "device owner" (مالك الجهاز). Enabled once with: adb shell dpm set-device-owner com.myassistant.app/.admin.AdminReceiver */
+class AdminReceiver : DeviceAdminReceiver() {
+    override fun onEnabled(context: Context, intent: Intent) {
+        DeviceOwner.onBecameOwner(context)
+    }
+}
+
+/** A blocked app: a package name when we know it, and the name to spot it in the store/installer. */
+data class BlockedApp(val name: String, val pkg: String?)
+
+/**
+ * Full control when the app is the phone's device owner: block installing chosen apps (removed silently if they
+ * get in), protect the assistant from being uninstalled, grant its own permissions, suspend apps, lock, reboot.
+ * Without device owner, blocking still works through the screen service (closing the store page / uninstall screen).
+ */
+object DeviceOwner {
+    const val ADB_COMMAND = "adb shell dpm set-device-owner com.myassistant.app/.admin.AdminReceiver"
+
+    fun admin(ctx: Context) = ComponentName(ctx, AdminReceiver::class.java)
+    private fun dpm(ctx: Context) = ctx.getSystemService(DevicePolicyManager::class.java)
+    fun isOwner(ctx: Context) = runCatching { dpm(ctx).isDeviceOwnerApp(ctx.packageName) }.getOrDefault(false)
+
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences("guard", Context.MODE_PRIVATE)
+
+    // ---------- PIN (protects unblocking and removing control) ----------
+
+    private fun hash(pin: String) = MessageDigest.getInstance("SHA-256").digest(("assistant:" + pin).toByteArray())
+        .joinToString("") { "%02x".format(it) }
+
+    fun hasPin(ctx: Context) = prefs(ctx).contains("pin")
+    fun checkPin(ctx: Context, pin: String) = !hasPin(ctx) || prefs(ctx).getString("pin", null) == hash(pin.trim())
+    fun setPin(ctx: Context, old: String, new: String): Boolean {
+        if (!checkPin(ctx, old)) return false
+        prefs(ctx).edit().apply { if (new.isBlank()) remove("pin") else putString("pin", hash(new.trim())) }.apply()
+        return true
+    }
+
+    // ---------- block list ----------
+
+    fun blocked(ctx: Context): List<BlockedApp> = prefs(ctx).getStringSet("blocked", emptySet()).orEmpty()
+        .map { val p = it.split('\u0001'); BlockedApp(p[0], p.getOrNull(1)?.ifBlank { null }) }
+        .sortedBy { it.name }
+
+    private fun save(ctx: Context, list: List<BlockedApp>) {
+        prefs(ctx).edit().putStringSet("blocked", list.map { it.name + '\u0001' + (it.pkg ?: "") }.toSet()).apply()
+    }
+
+    /** Finds an installed app by its name or package. */
+    fun findInstalled(ctx: Context, query: String): Pair<String, String>? {
+        val pm = ctx.packageManager
+        val q = query.trim()
+        val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { it.loadLabel(pm).toString() to it.activityInfo.packageName }.distinctBy { it.second }
+        return apps.firstOrNull { it.second.equals(q, true) }
+            ?: apps.firstOrNull { it.first.equals(q, true) }
+            ?: apps.firstOrNull { it.first.contains(q, true) }
+    }
+
+    /** Adds an app to the block list and removes it now if it's installed. Returns what happened. */
+    fun block(ctx: Context, nameOrPkg: String, pkgHint: String? = null): String {
+        val found = findInstalled(ctx, pkgHint ?: nameOrPkg)
+        val pkg = pkgHint?.takeIf { it.contains('.') } ?: found?.second ?: nameOrPkg.takeIf { it.contains('.') && ' ' !in it }
+        if (pkg == ctx.packageName) return "مينفعش أمنع نفسي 🙂"
+        val name = found?.first ?: nameOrPkg.trim()
+        val list = blocked(ctx).filterNot { it.name.equals(name, true) || (pkg != null && it.pkg == pkg) } + BlockedApp(name, pkg)
+        save(ctx, list)
+        val removed = if (pkg != null && installed(ctx, pkg)) remove(ctx, pkg) else null
+        return buildString {
+            append("✅ \"$name\" بقى ممنوع")
+            when {
+                removed == true -> append("، وكان متسطب فاتشال")
+                removed == false -> append("، وكان متسطب — فتحتلك شاشة الحذف")
+            }
+            if (!isOwner(ctx)) append(". (المنع شغال عن طريق التحكم في الشاشة — لمنع أقوى فعّل مالك الجهاز من الإعدادات)")
+        }
+    }
+
+    fun unblock(ctx: Context, nameOrPkg: String, pin: String): String {
+        if (!checkPin(ctx, pin)) return "❌ الرقم السري غلط"
+        val q = nameOrPkg.trim()
+        val before = blocked(ctx)
+        val after = before.filterNot { it.name.equals(q, true) || it.pkg.equals(q, true) || it.name.contains(q, true) }
+        if (after.size == before.size) return "مش لاقي \"$q\" في الممنوعين"
+        save(ctx, after)
+        (before - after.toSet()).mapNotNull { it.pkg }.forEach { p ->
+            runCatching { if (isOwner(ctx)) dpm(ctx).setApplicationHidden(admin(ctx), p, false) }
+        }
+        return "✅ شيلت المنع"
+    }
+
+    private fun installed(ctx: Context, pkg: String) = runCatching {
+        ctx.packageManager.getApplicationInfo(pkg, PackageManager.MATCH_UNINSTALLED_PACKAGES); true
+    }.getOrDefault(false)
+
+    /** Removes an app: silently when we're device owner, otherwise opens the uninstall screen (the screen service confirms it). */
+    fun remove(ctx: Context, pkg: String): Boolean {
+        if (isOwner(ctx)) {
+            runCatching { dpm(ctx).setApplicationHidden(admin(ctx), pkg, true) }
+            val ok = runCatching {
+                val pi = PendingIntent.getBroadcast(
+                    ctx, pkg.hashCode(), Intent(ACTION_REMOVED).setPackage(ctx.packageName),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+                ctx.packageManager.packageInstaller.uninstall(pkg, pi.intentSender)
+                true
+            }.getOrDefault(false)
+            if (ok) return true
+        }
+        pendingUninstall = pkg
+        runCatching {
+            ctx.startActivity(Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$pkg")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        return false
+    }
+
+    /** Package we asked the system to uninstall (the screen service presses OK on the confirm dialog). */
+    @Volatile var pendingUninstall: String? = null
+
+    private const val ACTION_REMOVED = "com.myassistant.app.APP_REMOVED"
+
+    /** Checks every blocked package and removes any that is installed. */
+    fun enforce(ctx: Context) {
+        blocked(ctx).mapNotNull { it.pkg }.filter { installed(ctx, it) }.forEach { remove(ctx, it) }
+    }
+
+    /** Called when an app gets installed. */
+    fun onInstalled(ctx: Context, pkg: String) {
+        val pm = ctx.packageManager
+        val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrNull()
+        val list = blocked(ctx)
+        val hit = list.firstOrNull { it.pkg == pkg || (label != null && it.pkg == null && label.equals(it.name, true)) } ?: return
+        if (hit.pkg == null) save(ctx, list - hit + hit.copy(pkg = pkg)) // learn the package for next time
+        remove(ctx, pkg)
+        ContextCompat.getMainExecutor(ctx).execute { Toast.makeText(ctx, "🚫 ${hit.name} ممنوع — اتشال", Toast.LENGTH_LONG).show() }
+    }
+
+    /** Listens for installs while the app's services are running. */
+    fun registerInstallWatcher(ctx: Context): BroadcastReceiver {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                val pkg = i.data?.schemeSpecificPart ?: return
+                runCatching { onInstalled(c.applicationContext, pkg) }
+            }
+        }
+        val f = IntentFilter().apply { addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package") }
+        ContextCompat.registerReceiver(ctx, r, f, ContextCompat.RECEIVER_EXPORTED)
+        return r
+    }
+
+    /** Text on screen that belongs to a blocked app in the store / installer, if any. */
+    val STORE_PKGS = setOf(
+        "com.android.vending", "com.hihonor.appmarket", "com.huawei.appmarket", "com.google.android.packageinstaller",
+        "com.android.packageinstaller", "com.hihonor.packageinstaller", "com.huawei.packageinstaller",
+        "com.apkpure.aegon", "com.uptodown", "com.aurora.store",
+    )
+
+    // ---------- device owner powers ----------
+
+    fun onBecameOwner(ctx: Context) {
+        runCatching { protectSelf(ctx) }
+        runCatching { enforce(ctx) }
+    }
+
+    /** The assistant can't be uninstalled, and gets all the permissions it asks for. */
+    fun protectSelf(ctx: Context) {
+        if (!isOwner(ctx)) return
+        val d = dpm(ctx)
+        val a = admin(ctx)
+        d.setUninstallBlocked(a, ctx.packageName, true)
+        val requested = ctx.packageManager.getPackageInfo(ctx.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty()
+        for (p in requested) {
+            if (p == "android.permission.ACCESS_BACKGROUND_LOCATION" && Build.VERSION.SDK_INT < 29) continue
+            runCatching { d.setPermissionGrantState(a, ctx.packageName, p, DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED) }
+        }
+    }
+
+    /** Stops the app from being opened (until unsuspended). */
+    fun suspend(ctx: Context, pkg: String, on: Boolean): Boolean =
+        isOwner(ctx) && runCatching { dpm(ctx).setPackagesSuspended(admin(ctx), arrayOf(pkg), on).isEmpty() }.getOrDefault(false)
+
+    fun lockNow(ctx: Context) = runCatching { dpm(ctx).lockNow() }.isSuccess
+
+    fun reboot(ctx: Context) = isOwner(ctx) && runCatching { dpm(ctx).reboot(admin(ctx)) }.isSuccess
+
+    /** Gives up device-owner control (PIN protected). */
+    fun release(ctx: Context, pin: String): Boolean {
+        if (!checkPin(ctx, pin) || !isOwner(ctx)) return false
+        val d = dpm(ctx)
+        runCatching { d.setUninstallBlocked(admin(ctx), ctx.packageName, false) }
+        @Suppress("DEPRECATION")
+        return runCatching { d.clearDeviceOwnerApp(ctx.packageName) }.isSuccess
+    }
+}
