@@ -117,7 +117,7 @@ fun SettingsScreen(vm: AppViewModel) {
                             "تسجيل الأماكن طول اليوم",
                             "نقطة كل حوالي ربع ساعة (خفيف على البطارية) — محفوظ على موبايلك بس",
                             vm.lightTracking,
-                        ) { vm.setLightTracking(it) }
+                        ) { vm.changeLightTracking(it) }
                         Row {
                             TextButton(onClick = { vm.openMap() }) { Text("🗺️ خريطتي") }
                             TextButton(onClick = { vm.toggleWalk() }) { Text(if (walking) "⏹ وقّف المشي" else "▶️ ابدأ تتبّع المشي") }

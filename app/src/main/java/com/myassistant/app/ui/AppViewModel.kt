@@ -81,7 +81,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     var lightTracking by mutableStateOf(com.myassistant.app.health.Health.lightTrackingOn(app))
         private set
-    fun setLightTracking(on: Boolean) {
+    fun changeLightTracking(on: Boolean) {
         lightTracking = on
         com.myassistant.app.health.Health.setLightTracking(getApplication(), on)
     }
