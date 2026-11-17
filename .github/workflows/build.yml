@@ -47,24 +47,36 @@ jobs:
           pip install -q huggingface_hub tokenizers onnxruntime numpy
           python tools/ci/gemma_ref.py
 
+      - name: Detect release
+        id: rel
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          v=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="$GITHUB_REF_NAME"; fi
+          if [[ -z "$v" ]]; then v=$(printf '%s' "$MSG" | grep -oE '\[release v[0-9][0-9.]*\]' | head -1 | sed -E 's/\[release (v[0-9.]+)\]/\1/' || true); fi
+          if [[ -z "$v" && "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then v="v0.$GITHUB_RUN_NUMBER"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
       - name: Build release APK
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-          VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          VERSION_NAME: ${{ steps.rel.outputs.version }}
           GEMMA_TEST_DIR: ${{ runner.temp }}/gemma
         run: |
           set -o pipefail
           gradle testReleaseUnitTest assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
-          cp app/build/outputs/apk/release/app-release.apk "assistant-${{ github.ref_name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "assistant-${{ steps.rel.outputs.version || github.ref_name }}.apk"
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: steps.rel.outputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.{0}', github.run_number) }}
-          name: مساعدي ${{ github.ref_name }}
+          tag_name: ${{ steps.rel.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: مساعدي ${{ steps.rel.outputs.version }}
           body: "نزّل ملف الـ APK وسطّبه على موبايلك. التحديث بيحافظ على إعداداتك وذاكرتك."
-          files: assistant-${{ github.ref_name }}.apk
+          files: assistant-${{ steps.rel.outputs.version }}.apk
           make_latest: true
 
       - name: Save build log
