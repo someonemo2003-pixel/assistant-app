@@ -36,6 +36,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -105,6 +106,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     Text("🔐 الصلاحيات (التحكم في الموبايل)")
                 }
             }
+            item { MailCard(vm) }
             item {
                 Text("🎙️ الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -285,6 +287,83 @@ private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete
                     Text(state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     Button(onClick = onDownload) { Text("حاول تاني") }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MailCard(vm: AppViewModel) {
+    val savedEmail by vm.mailEmail.collectAsState()
+    var email by remember(savedEmail) { mutableStateOf(savedEmail) }
+    var pass by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val uri = LocalUriHandler.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+
+    Text("📧 Gmail والتقرير اليومي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.size(8.dp))
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "الإيميل اللي كل حساباتك بتعمل له Forward. المساعد بيقراه في الخلفية من غير ما يفتح أي تطبيق، " +
+                    "وبيعرف كل رسالة جت لأنهي حساب.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                email, { email = it }, label = { Text("إيميل Gmail") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                pass, { pass = it }, label = { Text("App Password (16 حرف)") }, singleLine = true,
+                placeholder = { Text(if (vm.mailHasPassword()) "محفوظ ✓ — اكتب جديد لتغييره" else "xxxx xxxx xxxx xxxx") },
+                visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "اعمل App Password من هنا ↗ (لازم التحقق بخطوتين يكون مفعّل)",
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { runCatching { uri.openUri("https://myaccount.google.com/apppasswords") } },
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(enabled = !busy && email.contains('@'), onClick = {
+                    busy = true
+                    status = "⏳ بيجرّب الاتصال…"
+                    scope.launch {
+                        status = vm.saveAndTestMail(email, pass.takeIf { it.isNotBlank() })
+                        pass = ""
+                        busy = false
+                    }
+                }) { Text("حفظ واختبار") }
+                if (savedEmail.isNotBlank()) {
+                    TextButton(onClick = { vm.disconnectMail(); status = "اتشال الربط" }) {
+                        Text("فصل", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+
+            HorizontalDivider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("التقرير اليومي", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "إيميلات آخر ٢٤ ساعة + الرسايل + مواعيد النهارده، في إشعار ومحادثة.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = vm.reportOn, onCheckedChange = { vm.setReport(it) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = {
+                    android.app.TimePickerDialog(ctx, { _, h, m -> vm.setReport(true, h, m) }, vm.reportHour, vm.reportMinute, false).show()
+                }) { Text("الميعاد: " + String.format(java.util.Locale.US, "%02d:%02d", vm.reportHour, vm.reportMinute)) }
+                TextButton(onClick = { vm.reportNow() }) { Text("جرّب التقرير دلوقتي") }
             }
         }
     }

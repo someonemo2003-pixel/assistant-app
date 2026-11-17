@@ -196,6 +196,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- Gmail hub + daily report ----
+
+    val mailEmail = graph.mail.email
+    fun mailHasPassword() = graph.mail.hasPassword()
+
+    /** Saves the settings and tests the login; returns a message for the user. */
+    suspend fun saveAndTestMail(email: String, password: String?): String {
+        graph.mail.save(email, password)
+        val c = graph.mail.client() ?: return "اكتب الإيميل والـ App Password"
+        return withContext(Dispatchers.IO) {
+            try {
+                "✓ اتصل بنجاح — في صندوق الوارد ${c.test()} رسالة"
+            } catch (e: javax.mail.AuthenticationFailedException) {
+                "✗ الدخول فشل: راجع الإيميل والـ App Password (لازم التحقق بخطوتين يكون مفعّل)"
+            } catch (e: Exception) {
+                "✗ مشكلة في الاتصال: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    fun disconnectMail() = graph.mail.clear()
+
+    var reportOn by mutableStateOf(com.myassistant.app.mail.DailyReport.enabled(app))
+        private set
+    var reportHour by mutableStateOf(com.myassistant.app.mail.DailyReport.hour(app))
+        private set
+    var reportMinute by mutableStateOf(com.myassistant.app.mail.DailyReport.minute(app))
+        private set
+
+    fun setReport(on: Boolean, hour: Int = reportHour, minute: Int = reportMinute) {
+        reportOn = on; reportHour = hour; reportMinute = minute
+        com.myassistant.app.mail.DailyReport.configure(getApplication(), on, hour, minute)
+    }
+
+    /** Builds and shows the report right now (to try it). */
+    fun reportNow() {
+        notice = "⏳ بيجهّز التقرير…"
+        graph.appScope.launch {
+            val ctx = getApplication<Application>()
+            val msg = try {
+                com.myassistant.app.mail.DailyReport.deliver(ctx, com.myassistant.app.mail.DailyReport.build(ctx))
+                "📋 التقرير جاهز — هتلاقيه في الإشعارات وفي المحادثات"
+            } catch (e: Exception) {
+                "معرفتش أعمل التقرير: ${e.message}"
+            }
+            withContext(Dispatchers.Main) { notice = msg; loadConversations() }
+        }
+    }
+
     // ---- Meaning model ----
 
     fun downloadMeaningModel() {

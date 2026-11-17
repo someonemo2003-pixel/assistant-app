@@ -63,6 +63,9 @@ class ToolContext(
     /** Screen steps done during the current request, by stable selector (saved as a replayable recipe). */
     @Volatile var recorder: MutableList<String>? = null
     @Volatile var recordFailed = false
+    /** The Gmail hub (null until the user connects it). */
+    @Volatile var mail: com.myassistant.app.mail.MailConfig? = null
+
     /** Steps of the last completed screen task (for "save these steps"). */
     @Volatile var lastRecipe: List<String>? = null
 

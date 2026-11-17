@@ -84,6 +84,7 @@ class AppGraph(context: Context) {
     val memory: MemoryStore = SqliteMemoryStore(context)
     val chats = ChatStore(context)
     val experience = ExperienceStore(context)
+    val mail = com.myassistant.app.mail.MailConfig(context, secrets)
     val meaning = MeaningModel(context)
     val recall = Recall(meaning, memory, chats, experience)
 
@@ -98,6 +99,8 @@ class AppGraph(context: Context) {
         ListEventsTool(), AddEventTool(), LocationTool(),
         ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
         // device
+        com.myassistant.app.mail.CheckEmailTool(), com.myassistant.app.mail.SearchEmailTool(), com.myassistant.app.mail.ReadEmailTool(),
+        com.myassistant.app.mail.MarkEmailReadTool(), com.myassistant.app.mail.DraftEmailTool(), com.myassistant.app.mail.SendEmailTool(),
         ScreenTimeTool(), DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
     )
 
@@ -111,7 +114,7 @@ class AppGraph(context: Context) {
         ),
     )
 
-    val toolContext = ToolContext(context.applicationContext, memory, chats, experience, recall, settings)
+    val toolContext = ToolContext(context.applicationContext, memory, chats, experience, recall, settings).also { it.mail = mail }
     val router = ProviderRouter { providers.activeProviders() }
 
     val agent = Agent(
@@ -125,7 +128,10 @@ class AppGraph(context: Context) {
     val memoryExtractor = MemoryExtractor(router, memory)
 
     /** Loads the meaning model (if downloaded) and indexes anything new. */
+    private val appContext = context.applicationContext
+
     fun startBackground() {
+        runCatching { com.myassistant.app.mail.DailyReport.schedule(appContext) }
         appScope.launch {
             meaning.warmUp()
             runCatching { recall.backfill() }

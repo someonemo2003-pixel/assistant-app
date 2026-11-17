@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
         val listen = intent?.action == ACTION_LISTEN || intent?.action == Intent.ACTION_ASSIST ||
             intent?.action == Intent.ACTION_VOICE_COMMAND || intent?.getBooleanExtra(EXTRA_LISTEN, false) == true
         if (listen) vm.listenRequest++
+        if (intent?.getBooleanExtra("open_chats", false) == true) vm.screen = com.myassistant.app.ui.Screen.Chats
     }
 
     companion object {
