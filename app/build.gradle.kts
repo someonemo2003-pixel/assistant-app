@@ -15,7 +15,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        versionName = System.getenv("VERSION_NAME")?.removePrefix("v")?.ifBlank { null } ?: "0.1.$buildNumber"
         // Honor 400 and almost all modern phones are 64-bit ARM; keeps the APK small.
         ndk { abiFilters += listOf("arm64-v8a") }
     }
