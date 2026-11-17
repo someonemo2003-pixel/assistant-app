@@ -99,6 +99,16 @@ object Permissions {
         if (Build.VERSION.SDK_INT >= 33) {
             runtime("post_notif", "📣 إظهار إشعارات", "يبعتلك تنبيهات وتقارير.", Manifest.permission.POST_NOTIFICATIONS)
         }
+        if (Build.VERSION.SDK_INT >= 31) {
+            add(
+                PermItem(
+                    "exact_alarms", "⏰ تذكيرات في ميعادها بالظبط",
+                    "عشان التذكير ييجي في الدقيقة نفسها مش متأخر.",
+                    settingsIntent = { Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, pkgUri(it)) },
+                    isGranted = { com.myassistant.app.reminders.ReminderScheduler.canExact(it) },
+                ),
+            )
+        }
         add(
             PermItem(
                 "write_settings", "🔆 تعديل إعدادات النظام",

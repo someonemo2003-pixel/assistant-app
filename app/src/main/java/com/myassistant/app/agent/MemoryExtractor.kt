@@ -29,7 +29,8 @@ class MemoryExtractor(private val router: ProviderRouter, private val memory: Me
             appendLine("Keep only durable facts the user stated: their name, people in their life, preferences,")
             appendLine("work, routines, important dates, ongoing plans. Skip small talk, one-off requests, and anything")
             appendLine("already known. Never include passwords, card numbers, or ID numbers.")
-            appendLine("Write each fact as one short sentence in the user's language, one per line, starting with '- '.")
+            appendLine("Write each fact as one short sentence in the user's language, one per line, starting with '- [category] '.")
+            appendLine("category is one of: " + com.myassistant.app.memory.MemoryCategories.all.keys.joinToString(", ") + ".")
             appendLine("If there is nothing new, reply exactly: NONE")
             if (known.isNotBlank()) {
                 appendLine()
@@ -38,19 +39,24 @@ class MemoryExtractor(private val router: ProviderRouter, private val memory: Me
             }
         }
         val reply = router.complete(system, listOf(ChatMessage(role = Role.USER, text = lines)), emptyList())
+        val catRegex = Regex("^\\[([a-zA-Z]+)]\\s*")
         val facts = reply.text.lines()
             .map { it.trim() }
             .filter { it.startsWith("- ") || it.startsWith("• ") }
             .map { it.drop(2).trim() }
-            .filter { it.length in 4..300 }
+            .map { line ->
+                val m = catRegex.find(line)
+                (m?.groupValues?.get(1)) to (if (m != null) line.removeRange(m.range).trim() else line)
+            }
+            .filter { it.second.length in 4..300 }
             .take(10)
 
         return withContext(Dispatchers.IO) {
             val existing = memory.recent(2000).map { ArabicText.normalizeForIndex(it.text) }.toHashSet()
             var saved = 0
-            for (f in facts) {
+            for ((cat, f) in facts) {
                 if (existing.add(ArabicText.normalizeForIndex(f))) {
-                    memory.add(f)
+                    memory.add(f, com.myassistant.app.memory.MemoryCategories.normalize(cat))
                     saved++
                 }
             }

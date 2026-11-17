@@ -293,6 +293,92 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         graph.appScope.launch { graph.meaning.delete() }
     }
 
+    // ---- Data hub: expenses, reminders, places, backup ----
+
+    val expenses = mutableStateListOf<com.myassistant.app.finance.Expense>()
+    var expenseMonthOffset by mutableStateOf(0)
+        private set
+
+    fun loadExpenses(monthOffset: Int = expenseMonthOffset) {
+        expenseMonthOffset = monthOffset
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val list = withContext(Dispatchers.IO) {
+                runCatching { com.myassistant.app.finance.ExpenseSync.scanSms(ctx) }
+                val (from, to) = com.myassistant.app.finance.monthRange(monthOffset)
+                com.myassistant.app.finance.ExpenseStore.get(ctx).list(from, to)
+            }
+            expenses.clear(); expenses.addAll(list)
+        }
+    }
+
+    fun setExpenseCategory(id: Long, category: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { com.myassistant.app.finance.ExpenseStore.get(getApplication()).setCategory(id, category) }
+            val i = expenses.indexOfFirst { it.id == id }
+            if (i >= 0) expenses[i] = expenses[i].copy(category = category)
+        }
+    }
+
+    fun deleteExpense(id: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { com.myassistant.app.finance.ExpenseStore.get(getApplication()).delete(id) }
+            expenses.removeAll { it.id == id }
+        }
+    }
+
+    val reminders = mutableStateListOf<com.myassistant.app.reminders.Reminder>()
+    val places = mutableStateListOf<com.myassistant.app.reminders.SavedPlace>()
+
+    fun loadReminders() {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val (r, p) = withContext(Dispatchers.IO) {
+                val st = com.myassistant.app.reminders.ReminderStore.get(ctx)
+                st.all() to st.places()
+            }
+            reminders.clear(); reminders.addAll(r)
+            places.clear(); places.addAll(p)
+        }
+    }
+
+    fun deleteReminder(r: com.myassistant.app.reminders.Reminder) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            withContext(Dispatchers.IO) {
+                com.myassistant.app.reminders.ReminderScheduler.cancel(ctx, r)
+                com.myassistant.app.reminders.ReminderStore.get(ctx).delete(r.id)
+            }
+            reminders.removeAll { it.id == r.id }
+        }
+    }
+
+    fun deletePlace(name: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { com.myassistant.app.reminders.ReminderStore.get(getApplication()).deletePlace(name) }
+            places.removeAll { it.name == name }
+        }
+    }
+
+    fun exportBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            notice = try {
+                val n = withContext(Dispatchers.IO) { com.myassistant.app.data.Backup.export(getApplication(), uri) }
+                "💾 اتحفظت النسخة الاحتياطية ($n ملف)"
+            } catch (e: Exception) {
+                "معرفتش أحفظ النسخة: ${e.message}"
+            }
+        }
+    }
+
+    /** Returns true if the app must restart. */
+    suspend fun importBackup(uri: android.net.Uri): String = try {
+        val n = withContext(Dispatchers.IO) { com.myassistant.app.data.Backup.restore(getApplication(), uri) }
+        "OK:$n"
+    } catch (e: Exception) {
+        "ERR:${e.message}"
+    }
+
     // ---- Chats ----
 
     fun loadConversations() {
@@ -373,10 +459,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addMemory(text: String) {
+    fun setMemoryCategory(id: Long, category: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { graph.memory.setCategory(id, category) }
+            val i = memories.indexOfFirst { it.id == id }
+            if (i >= 0) memories[i] = memories[i].copy(category = category)
+        }
+    }
+
+    fun addMemory(text: String, category: String = com.myassistant.app.memory.MemoryCategories.GENERAL) {
         if (text.isBlank()) return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { graph.memory.add(text) }
+            withContext(Dispatchers.IO) { graph.memory.add(text, category) }
             loadMemories()
             graph.indexSoon()
         }

@@ -227,6 +227,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     onEdit = { editing = c },
                 )
             }
+            item { BackupCard(vm) }
             item {
                 OutlinedButton(
                     onClick = {
@@ -609,4 +610,62 @@ private fun ProviderDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
     )
+}
+
+
+@Composable
+private fun BackupCard(vm: AppViewModel) {
+    val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var status by remember { mutableStateOf<String?>(null) }
+    var pending by remember { mutableStateOf<android.net.Uri?>(null) }
+    val exporter = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri -> if (uri != null) { vm.exportBackup(uri); status = "✅ اتحفظت النسخة" } }
+    val importer = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri -> pending = uri }
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("💾 نسخة احتياطية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "الذاكرة والمحادثات والمصاريف والتذكيرات والإعدادات في ملف واحد. المفاتيح وباسورد الإيميل مش بتتحفظ فيها (للأمان).",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                    exporter.launch("assistant-backup-$d.zip")
+                }) { Text("احفظ نسخة") }
+                OutlinedButton(onClick = { importer.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }) { Text("استرجع") }
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+
+    pending?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text("استرجاع النسخة؟") },
+            text = { Text("هيتم استبدال بياناتك الحالية باللي في الملف، والتطبيق هيقفل ويفتح تاني.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pending = null
+                    scope.launch {
+                        val r = vm.importBackup(uri)
+                        if (r.startsWith("OK")) {
+                            val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+                            val restart = android.content.Intent.makeRestartActivityTask(intent!!.component)
+                            ctx.startActivity(restart)
+                            Runtime.getRuntime().exit(0)
+                        } else {
+                            status = "❌ " + r.removePrefix("ERR:")
+                        }
+                    }
+                }) { Text("استرجع") }
+            },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text("إلغاء") } },
+        )
+    }
 }

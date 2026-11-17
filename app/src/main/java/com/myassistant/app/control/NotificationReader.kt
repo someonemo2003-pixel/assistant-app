@@ -71,7 +71,12 @@ class NotificationReader : NotificationListenerService() {
             for (t in texts) {
                 if (title.isEmpty() && t.isEmpty()) continue
                 val item = SavedNotification(0, sbn.key, sbn.packageName, app, sub, title, t.take(1500), sbn.postTime, isEmail, isMessage)
-                if (store.save(item)) fresh += item
+                if (store.save(item)) {
+                    fresh += item
+                    if (!isMessage && !isEmail) {
+                        runCatching { com.myassistant.app.finance.ExpenseSync.fromNotification(this, app, sbn.packageName, "$title $t", sbn.postTime) }
+                    }
+                }
             }
         }
         if (alert && fresh.isNotEmpty()) checkAlerts(fresh)

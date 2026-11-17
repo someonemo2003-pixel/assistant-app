@@ -121,7 +121,7 @@ fun ChatScreen(vm: AppViewModel) {
                 },
                 actions = {
                     IconButton(onClick = { vm.screen = Screen.Chats }) { Icon(Icons.AutoMirrored.Filled.List, "المحادثات") }
-                    IconButton(onClick = { vm.screen = Screen.Memory }) { Icon(Icons.Filled.Star, "الذاكرة") }
+                    IconButton(onClick = { vm.screen = Screen.Memory }) { Icon(Icons.Filled.Star, "بياناتي") }
                     if (vm.messages.isNotEmpty()) {
                         IconButton(onClick = { vm.newChat() }) { Icon(Icons.Filled.Add, "محادثة جديدة") }
                     }

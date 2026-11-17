@@ -5,7 +5,27 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-data class MemoryItem(val id: Long, val text: String, val createdAt: Long)
+data class MemoryItem(val id: Long, val text: String, val createdAt: Long, val category: String = MemoryCategories.GENERAL)
+
+/** Folders for what the assistant knows about you, so things aren't all mixed together. */
+object MemoryCategories {
+    const val GENERAL = "general"
+    /** key → Arabic label with icon. Order = display order. */
+    val all = linkedMapOf(
+        "personal" to "👤 عني",
+        "people" to "👨‍👩‍👧 ناس",
+        "work" to "💼 شغل ودراسة",
+        "health" to "❤️ صحة",
+        "money" to "💰 فلوس",
+        "places" to "📍 أماكن",
+        "dates" to "📅 مناسبات ومواعيد",
+        "preferences" to "⭐ تفضيلات",
+        GENERAL to "🗂️ عام",
+    )
+
+    fun normalize(key: String?): String = key?.trim()?.lowercase()?.takeIf { it in all } ?: GENERAL
+    fun label(key: String) = all[key] ?: all.getValue(GENERAL)
+}
 
 /**
  * Long-term memory, stored only on the phone.
@@ -14,7 +34,8 @@ data class MemoryItem(val id: Long, val text: String, val createdAt: Long)
  * All methods are blocking — call them off the main thread.
  */
 interface MemoryStore {
-    fun add(text: String): Long
+    fun add(text: String, category: String = MemoryCategories.GENERAL): Long
+    fun setCategory(id: Long, category: String) = Unit
     fun search(query: String, limit: Int = 6): List<MemoryItem>
     fun recent(limit: Int = 500): List<MemoryItem>
     fun delete(id: Long)
@@ -27,7 +48,7 @@ interface MemoryStore {
 }
 
 class SqliteMemoryStore(context: Context) :
-    SQLiteOpenHelper(context, "memory.db", null, 2), MemoryStore {
+    SQLiteOpenHelper(context, "memory.db", null, 3), MemoryStore {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -35,10 +56,31 @@ class SqliteMemoryStore(context: Context) :
                 "text, norm, created_at, notindexed=text, notindexed=created_at, tokenize=unicode61)",
         )
         db.execSQL(VEC_TABLE)
+        db.execSQL(META_TABLE)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) db.execSQL(VEC_TABLE)
+        if (oldVersion < 3) db.execSQL(META_TABLE)
+    }
+
+    override fun setCategory(id: Long, category: String) {
+        writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO memory_meta (id, category) VALUES (?, ?)",
+            arrayOf<Any>(id, MemoryCategories.normalize(category)),
+        )
+    }
+
+    private fun categoryOf(ids: Collection<Long>): Map<Long, String> {
+        if (ids.isEmpty()) return emptyMap()
+        return readableDatabase.rawQuery(
+            "SELECT id, category FROM memory_meta WHERE id IN (${ids.joinToString(",")})", null,
+        ).use { c -> buildMap { while (c.moveToNext()) put(c.getLong(0), c.getString(1)) } }
+    }
+
+    private fun withCategories(items: List<MemoryItem>): List<MemoryItem> {
+        val cats = categoryOf(items.map { it.id })
+        return items.map { it.copy(category = cats[it.id] ?: MemoryCategories.GENERAL) }
     }
 
     override fun missingVectors(limit: Int): List<MemoryItem> =
@@ -59,7 +101,7 @@ class SqliteMemoryStore(context: Context) :
         return recent(100_000).mapNotNull { m -> vecs[m.id]?.let { m to it } }
     }
 
-    override fun add(text: String): Long {
+    override fun add(text: String, category: String): Long {
         val clean = text.trim()
         if (clean.isEmpty()) return -1
         val values = ContentValues().apply {
@@ -67,7 +109,9 @@ class SqliteMemoryStore(context: Context) :
             put("norm", ArabicText.normalizeForIndex(clean))
             put("created_at", System.currentTimeMillis())
         }
-        return writableDatabase.insert("memories", null, values)
+        val id = writableDatabase.insert("memories", null, values)
+        if (id > 0) setCategory(id, category)
+        return id
     }
 
     override fun search(query: String, limit: Int): List<MemoryItem> {
@@ -86,7 +130,7 @@ class SqliteMemoryStore(context: Context) :
                 }
             }
         }
-        return found.sortedByDescending { it.first }.take(limit).map { it.second }
+        return withCategories(found.sortedByDescending { it.first }.take(limit).map { it.second })
     }
 
     override fun recent(limit: Int): List<MemoryItem> =
@@ -95,15 +139,17 @@ class SqliteMemoryStore(context: Context) :
             arrayOf(limit.toString()),
         ).use { c ->
             buildList { while (c.moveToNext()) add(MemoryItem(c.getLong(0), c.getString(1), c.getLong(2))) }
-        }
+        }.let { withCategories(it) }
 
     override fun delete(id: Long) {
         writableDatabase.execSQL("DELETE FROM memories WHERE docid = ?", arrayOf(id))
         writableDatabase.execSQL("DELETE FROM memory_vec WHERE id = ?", arrayOf(id))
+        writableDatabase.execSQL("DELETE FROM memory_meta WHERE id = ?", arrayOf(id))
     }
 
     private companion object {
         const val VEC_TABLE = "CREATE TABLE IF NOT EXISTS memory_vec (id INTEGER PRIMARY KEY, vec BLOB NOT NULL)"
+        const val META_TABLE = "CREATE TABLE IF NOT EXISTS memory_meta (id INTEGER PRIMARY KEY, category TEXT NOT NULL)"
     }
 
     override fun count(): Int =
