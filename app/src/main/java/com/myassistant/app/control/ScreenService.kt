@@ -149,11 +149,11 @@ class ScreenService : AccessibilityService() {
     private val installWords = listOf("تثبيت", "Install", "تنزيل", "Get", "تحديث", "Update")
     private val cancelWords = listOf("إلغاء", "Cancel")
 
-    private fun label(n: AccessibilityNodeInfo) = (n.text ?: n.contentDescription)?.toString()?.trim().orEmpty()
+    private fun nodeLabel(n: AccessibilityNodeInfo) = (n.text ?: n.contentDescription)?.toString()?.trim().orEmpty()
 
     /** Nodes on screen whose own label is exactly one of [words]. */
     private fun exact(root: AccessibilityNodeInfo, words: List<String>): List<AccessibilityNodeInfo> =
-        words.flatMap { w -> root.findAccessibilityNodeInfosByText(w).filter { label(it).equals(w, true) } }
+        words.flatMap { w -> root.findAccessibilityNodeInfosByText(w).filter { nodeLabel(it).equals(w, true) } }
             .distinctBy { val r = Rect(); it.getBoundsInScreen(r); r.toShortString() }
 
     /** Smallest ancestor (within a few levels) whose subtree shows the blocked app's name, if it's "its" card/page. */
@@ -161,7 +161,7 @@ class ScreenService : AccessibilityService() {
         var n: AccessibilityNodeInfo? = btn.parent
         var depth = 0
         while (n != null && depth < 10) {
-            val hasName = n.findAccessibilityNodeInfosByText(name).any { label(it).equals(name, true) || label(it).startsWith("$name:", true) || label(it).startsWith("$name -", true) }
+            val hasName = n.findAccessibilityNodeInfosByText(name).any { nodeLabel(it).equals(name, true) || nodeLabel(it).startsWith("$name:", true) || nodeLabel(it).startsWith("$name -", true) }
             if (hasName) return if (exact(n, installWords).size <= 2) n else null
             n = n.parent; depth++
         }
