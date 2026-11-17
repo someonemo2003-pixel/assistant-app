@@ -75,7 +75,8 @@ object DailyReport {
     )
 
     /** Which parts the scheduled daily report includes (all by default). */
-    fun sources(ctx: Context): Set<String> = prefs(ctx).getStringSet("sources", null)?.toSet() ?: SOURCES.keys
+    @Suppress("UNUSED_PARAMETER")
+    fun sources(ctx: Context): Set<String> = setOf("email") // the daily report is Gmail only
 
     fun setSources(ctx: Context, s: Set<String>) {
         prefs(ctx).edit().putStringSet("sources", s).apply()

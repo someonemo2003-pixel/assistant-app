@@ -71,7 +71,6 @@ fun MemoryScreen(vm: AppViewModel) {
                 navigationIcon = {
                     IconButton(onClick = { vm.screen = Screen.Chat }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
                 },
-                actions = { TextButton(onClick = { vm.openMap() }) { Text("🗺️ مشواري في Maps") } },
             )
         },
     ) { padding ->

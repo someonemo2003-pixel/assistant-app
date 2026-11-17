@@ -105,31 +105,13 @@ fun SettingsScreen(vm: AppViewModel) {
         ) {
             item {
                 Button(onClick = { vm.screen = Screen.Permissions }, modifier = Modifier.fillMaxWidth()) {
-                    Text("🔐 الصلاحيات (التحكم في الموبايل)")
+                    Text("الصلاحيات (التحكم في الموبايل)")
                 }
             }
             item { MailCard(vm) }
+            item { ReportCard(vm) }
             item {
-                val walking by vm.walking.collectAsState()
-                Text("🚶 الصحة والأماكن", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.size(8.dp))
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        ToggleRow(
-                            "تسجيل الأماكن طول اليوم",
-                            "نقطة كل حوالي ربع ساعة (خفيف على البطارية) — محفوظ على موبايلك بس",
-                            vm.lightTracking,
-                        ) { vm.changeLightTracking(it) }
-                        Row {
-                            TextButton(onClick = { vm.openMap() }) { Text("🗺️ مشواري في Maps") }
-                            TextButton(onClick = { vm.toggleWalk() }) { Text(if (walking) "⏹ وقّف المشي" else "▶️ ابدأ تتبّع المشي") }
-                            TextButton(onClick = { vm.clearPlaces() }) { Text("مسح السجل", color = MaterialTheme.colorScheme.error) }
-                        }
-                    }
-                }
-            }
-            item {
-                Text("🎙️ الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -140,13 +122,6 @@ fun SettingsScreen(vm: AppViewModel) {
                             "بعد ما يرد، يسمعك تاني على طول من غير ما تدوس. قول \"خلاص\" أو \"شكراً\" عشان يقف.",
                             handsFree,
                         ) { vm.settings.setHandsFree(it) }
-                        Text(
-                            "طرق سريعة تكلمه بيها: دوس مطوّل على أيقونة التطبيق ← \"اتكلم\"، أو ضيف زرار \"كلّم Nova\" " +
-                                "في شريط الإعدادات السريعة (اسحب لتحت ← ✏️ تعديل)، أو اختاره مساعد افتراضي من " +
-                                "الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← المساعد.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                         Row {
                             TextButton(onClick = {
                                 runCatching {
@@ -165,7 +140,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 }
             }
             item {
-                Text("⚡ العقل السريع والتعلّم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("العقل السريع والتعلّم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -180,40 +155,28 @@ fun SettingsScreen(vm: AppViewModel) {
                             "لما تبدأ محادثة جديدة، يحفظ المعلومات المهمة من اللي فاتت (طلب واحد للعقل الكبير)",
                             autoMemory,
                         ) { vm.settings.setAutoMemory(it) }
-                        TextButton(onClick = { vm.screen = Screen.Learned }) { Text("شوف اللي اتعلمه ←") }
+                        TextButton(onClick = { vm.screen = Screen.Learned }) { Text("شوف اللي اتعلمه ") }
                     }
                 }
             }
             item { MeaningModelCard(meaning, onDownload = vm::downloadMeaningModel, onDelete = vm::deleteMeaningModel) }
             item {
-                Text("🧭 مين يعمل إيه", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("مين يعمل إيه", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        BrainPicker("💬 الدردشة والأسئلة", "محتاج عقل فاهم عربي كويس (Gemini مثلاً)", chatBrain, configs) {
+                        BrainPicker("الدردشة والأسئلة", "محتاج عقل فاهم عربي كويس (Gemini مثلاً)", chatBrain, configs) {
                             vm.settings.setChatBrain(it)
                         }
-                        BrainPicker("📱 تنفيذ الأوامر على الموبايل", "محتاج عقل سريع في الخطوات", actionBrain, configs) {
+                        BrainPicker("تنفيذ الأوامر على الموبايل", "محتاج عقل سريع في الخطوات", actionBrain, configs) {
                             vm.settings.setActionBrain(it)
                         }
-                        Text(
-                            "لو اللي اخترته وقع أو خلص الحد المجاني، بينقل للباقيين بالترتيب اللي تحت.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
             item {
-                Text("🧠 المزوّدين (العقل الكبير)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            item {
-                Text(
-                    "المساعد بيجرّب المزوّدين بالترتيب ده. لو واحد خلص الحد المجاني أو وقع، ينقل للي بعده لوحده.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Text("المزوّدين (العقل الكبير)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             itemsIndexed(configs, key = { _, c -> c.id }) { index, c ->
                 val hasKey = remember(c.id, keysVersion) { vm.providerStore.hasKey(c.id) }
@@ -269,19 +232,12 @@ fun SettingsScreen(vm: AppViewModel) {
 private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🧩 موديل فهم المعنى", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "موديل صغير من Google (EmbeddingGemma) بيشتغل على موبايلك من غير نت. بيخلّي العقل السريع يفهم " +
-                    "نفس الطلب لو اتقال بكلام مختلف، ويدوّر في الذاكرة والشاتات بالمعنى.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text("موديل فهم المعنى", style = MaterialTheme.typography.titleSmall)
             when (state) {
                 is ModelState.NotDownloaded -> {
                     Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
                         Text("تحميل (حوالي ${MeaningModel.APPROX_MB} ميجا)")
                     }
-                    Text("يفضّل على Wi-Fi. التحميل بيكمّل من مكان ما وقف لو النت قطع.", style = MaterialTheme.typography.labelSmall)
                 }
                 is ModelState.Downloading -> {
                     val frac = if (state.total > 0) state.downloaded.toFloat() / state.total else 0f
@@ -291,7 +247,7 @@ private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                     Text(
-                        "بيتحمّل… ${state.downloaded / 1_000_000} / ${state.total / 1_000_000} ميجا — سيب التطبيق مفتوح",
+                        "${state.downloaded / 1_000_000} / ${state.total / 1_000_000} ميجا",
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -303,7 +259,7 @@ private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.size(6.dp))
-                        Text("شغال ✓", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelLarge)
+                        Text("شغال ", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.weight(1f))
                         TextButton(onClick = onDelete) { Text("مسح الموديل", color = MaterialTheme.colorScheme.error) }
                     }
@@ -328,27 +284,21 @@ private fun MailCard(vm: AppViewModel) {
     val uri = LocalUriHandler.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
 
-    Text("📧 Gmail والتقرير اليومي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text("Gmail", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Spacer(Modifier.size(8.dp))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                "الإيميل اللي كل حساباتك بتعمل له Forward. المساعد بيقراه في الخلفية من غير ما يفتح أي تطبيق، " +
-                    "وبيعرف كل رسالة جت لأنهي حساب.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             OutlinedTextField(
                 email, { email = it }, label = { Text("إيميل Gmail") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 pass, { pass = it }, label = { Text("App Password (16 حرف)") }, singleLine = true,
-                placeholder = { Text(if (vm.mailHasPassword()) "محفوظ ✓ — اكتب جديد لتغييره" else "xxxx xxxx xxxx xxxx") },
+                placeholder = { Text(if (vm.mailHasPassword()) "محفوظ — اكتب جديد لتغييره" else "xxxx xxxx xxxx xxxx") },
                 visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "اعمل App Password من هنا ↗ (لازم التحقق بخطوتين يكون مفعّل)",
+                "إنشاء App Password",
                 color = MaterialTheme.colorScheme.primary,
                 textDecoration = TextDecoration.Underline,
                 style = MaterialTheme.typography.bodySmall,
@@ -357,7 +307,7 @@ private fun MailCard(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(enabled = !busy && email.contains('@'), onClick = {
                     busy = true
-                    status = "⏳ بيجرّب الاتصال…"
+                    status = "بيجرّب الاتصال…"
                     scope.launch {
                         status = vm.saveAndTestMail(email, pass.takeIf { it.isNotBlank() })
                         pass = ""
@@ -372,30 +322,6 @@ private fun MailCard(vm: AppViewModel) {
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
-            HorizontalDivider()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("التقرير اليومي", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "اختار هيبقى فيه إيه. وتقدر تطلب أي تقرير من الشات: \"تقرير الجيميل بس\" أو \"تقرير واتس التوأم\".",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = vm.reportOn, onCheckedChange = { vm.setReport(it) })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = {
-                    android.app.TimePickerDialog(ctx, { _, h, m -> vm.setReport(true, h, m) }, vm.reportHour, vm.reportMinute, false).show()
-                }) { Text("الميعاد: " + String.format(java.util.Locale.US, "%02d:%02d", vm.reportHour, vm.reportMinute)) }
-                TextButton(onClick = { vm.reportNow() }) { Text("جرّب التقرير دلوقتي") }
-            }
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                com.myassistant.app.mail.DailyReport.SOURCES.forEach { (k, label) ->
-                    FilterChip(selected = k in vm.reportSources, onClick = { vm.toggleReportSource(k) }, label = { Text(label) })
-                }
-            }
-            AccountsSection(vm)
         }
     }
 }
@@ -408,16 +334,10 @@ private fun AccountsSection(vm: AppViewModel) {
     var editing by remember { mutableStateOf<AppViewModel.ChatAccount?>(null) }
     HorizontalDivider()
     Text("حسابات الشات", style = MaterialTheme.typography.titleSmall)
-    Text(
-        "كل نسخة/حساب ظهر في الإشعارات. سمّي كل واحد (مثلاً شخصي، شغل) عشان تطلب تقريره لوحده.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
     vm.chatAccounts.forEach { a ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(a.label, style = MaterialTheme.typography.bodyMedium)
-                Text("${a.count} رسالة · ${a.raw}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = { editing = a }) { Icon(Icons.Filled.Edit, "تسمية") }
         }
@@ -441,7 +361,6 @@ private fun BrainPicker(title: String, hint: String, selected: String, configs: 
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box {
             TextButton(onClick = { open = true }) { Text(current, maxLines = 1) }
@@ -460,7 +379,6 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChang
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.size(8.dp))
         Switch(checked = checked, onCheckedChange = onChange)
@@ -585,14 +503,14 @@ private fun ProviderDialog(
                     value = key,
                     onValueChange = { key = it },
                     label = { Text("مفتاح الـ API") },
-                    placeholder = { Text(if (hasKey) "محفوظ ✓ — اكتب جديد لتغييره" else "الصق المفتاح هنا") },
+                    placeholder = { Text(if (hasKey) "محفوظ — اكتب جديد لتغييره" else "الصق المفتاح هنا") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 initial.keyUrl?.let { url ->
                     Text(
-                        "هات مفتاح مجاني من هنا ↗",
+                        "هات مفتاح مجاني من هنا ",
                         color = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
                         style = MaterialTheme.typography.bodyMedium,
@@ -636,7 +554,7 @@ private fun ProviderDialog(
                     }
                 }
                 Text(
-                    "دوس ↻ عشان تختار من الموديلات المتاحة لمفتاحك.",
+                    "دوس عشان تختار من الموديلات المتاحة لمفتاحك.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -666,18 +584,14 @@ private fun BackupCard(vm: AppViewModel) {
     var pending by remember { mutableStateOf<android.net.Uri?>(null) }
     val exporter = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
-    ) { uri -> if (uri != null) { vm.exportBackup(uri); status = "✅ اتحفظت النسخة" } }
+    ) { uri -> if (uri != null) { vm.exportBackup(uri); status = "اتحفظت النسخة" } }
     val importer = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri -> pending = uri }
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("💾 نسخة احتياطية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "الذاكرة والمحادثات والمصاريف والتذكيرات والإعدادات في ملف واحد. المفاتيح وباسورد الإيميل مش بتتحفظ فيها (للأمان).",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text("نسخة احتياطية", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
@@ -705,7 +619,7 @@ private fun BackupCard(vm: AppViewModel) {
                             ctx.startActivity(restart)
                             Runtime.getRuntime().exit(0)
                         } else {
-                            status = "❌ " + r.removePrefix("ERR:")
+                            status = "" + r.removePrefix("ERR:")
                         }
                     }
                 }) { Text("استرجع") }
@@ -716,110 +630,33 @@ private fun BackupCard(vm: AppViewModel) {
 }
 
 
-/** 🛡️ Full control: block apps, PIN, device owner status and how to turn it on. */
+/** Full control: add apps to block (permanent — no list, no undo). */
 @Composable
 private fun GuardCard() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val clip = androidx.compose.ui.platform.LocalClipboardManager.current
     val D = com.myassistant.app.admin.DeviceOwner
-    var tick by remember { mutableStateOf(0) }
-    val owner = remember(tick) { D.isOwner(ctx) }
-    val blocked = remember(tick) { D.blocked(ctx) }
+    val owner = remember { D.isOwner(ctx) }
     var newApp by remember { mutableStateOf("") }
     var msg by remember { mutableStateOf<String?>(null) }
-    var pinFor by remember { mutableStateOf<String?>(null) } // "unblock:<name>" | "setpin" | "release"
-    var showSteps by remember { mutableStateOf(false) }
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("🛡️ التحكم الكامل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                if (owner) "✅ مالك الجهاز شغال: المنع من النظام نفسه، وNova مايتمسحش." else "⚪ مالك الجهاز مش مفعّل — المنع شغال بالتحكم في الشاشة بس.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text("التحكم الكامل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(newApp, { newApp = it }, placeholder = { Text("اسم برنامج تمنعه…") }, singleLine = true, modifier = Modifier.weight(1f))
-                TextButton(onClick = { msg = D.block(ctx, newApp); newApp = ""; tick++ }, enabled = newApp.isNotBlank()) { Text("امنع") }
+                OutlinedTextField(newApp, { newApp = it; msg = null }, placeholder = { Text("اسم برنامج") }, singleLine = true, modifier = Modifier.weight(1f))
+                TextButton(onClick = { D.block(ctx, newApp); msg = "اتمنع"; newApp = "" }, enabled = newApp.isNotBlank()) { Text("امنع") }
             }
-            val browsersOnly = remember(tick) { D.browsersOnly(ctx) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("🌐 المتصفحات: Chrome وEdge واللي مع الموبايل بس", style = MaterialTheme.typography.bodyMedium)
-                    Text("أي متصفح تاني بيتمنع في المتجر، ولو اتسطب بيتشال", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = browsersOnly, onCheckedChange = { on ->
-                    if (on) { D.setBrowsersOnly(ctx, true, ""); tick++ } else pinFor = "browsers_off"
-                })
-            }
-            blocked.distinctBy { it.name.lowercase() }.forEach { b ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🚫 ${b.name}", modifier = Modifier.weight(1f))
-                    TextButton(onClick = { pinFor = "unblock:" + b.name }) { Text("شيل") }
-                }
-            }
-            msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (blocked.isNotEmpty()) {
-                val check = remember(tick) { D.lastStoreCheck }
-                Text(
-                    "آخر فحص للمتجر: " + check.ifEmpty { "لسه — افتح المتجر وارجع هنا" },
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { tick++ },
-                )
-            }
-            Row {
-                TextButton(onClick = { pinFor = "setpin" }) { Text(if (D.hasPin(ctx)) "غيّر الرقم السري" else "حط رقم سري") }
-                if (owner) TextButton(onClick = { pinFor = "release" }) { Text("إلغاء مالك الجهاز", color = MaterialTheme.colorScheme.error) }
-                else TextButton(onClick = { showSteps = !showSteps }) { Text("إزاي أفعّل مالك الجهاز؟") }
-            }
-            if (showSteps && !owner) {
-                Text(
-                    "1) خد باك أب للواتس التوأم (إعدادات واتساب ← الدردشات ← نسخ احتياطي) وبعدين اقفل App Twin.\n" +
-                        "2) الإعدادات ← المستخدمين والحسابات: شيل كل الحسابات (جوجل، Honor ID، وأي حساب تاني) مؤقتاً.\n" +
-                        "3) فعّل خيارات المطوّر وتصحيح USB، ووصّل الموبايل باللابتوب.\n" +
-                        "4) على اللابتوب نزّل Platform-Tools من جوجل، وافتح الترمينال في الفولدر واكتب الأمر ده:",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(D.ADB_COMMAND, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(D.ADB_COMMAND)) }) { Text("📋 انسخ الأمر") }
-                Text("5) لما يقول Success رجّع حساباتك والـ Twin، وارجع هنا تلاقيها ✅.", style = MaterialTheme.typography.bodySmall)
+            msg?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (!owner) {
+                Text("مالك الجهاز مش مفعّل", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(D.ADB_COMMAND)) }) { Text("انسخ أمر التفعيل") }
             }
         }
     }
-
-    pinFor?.let { what ->
-        var old by remember(what) { mutableStateOf("") }
-        var new by remember(what) { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { pinFor = null },
-            title = { Text(when { what == "setpin" -> "الرقم السري"; what == "release" -> "إلغاء مالك الجهاز"; what == "browsers_off" -> "السماح بكل المتصفحات"; else -> "شيل المنع" }) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (D.hasPin(ctx)) OutlinedTextField(old, { old = it }, label = { Text("الرقم الحالي") }, singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                    if (what == "setpin") OutlinedTextField(new, { new = it }, label = { Text("الرقم الجديد (فاضي = من غير رقم)") }, singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                    if (what == "release") Text("هترجع للمنع بالتحكم في الشاشة بس، وNova هيبقى ينفع يتمسح.")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    msg = when {
-                        what == "setpin" -> if (D.setPin(ctx, old, new)) "✅ اتحفظ" else "❌ الرقم الحالي غلط"
-                        what == "release" -> if (D.release(ctx, old)) "تم إلغاء مالك الجهاز" else "❌ الرقم غلط"
-                        what == "browsers_off" -> if (D.setBrowsersOnly(ctx, false, old)) "✅ كل المتصفحات مسموحة" else "❌ الرقم غلط"
-                        else -> D.unblock(ctx, what.removePrefix("unblock:"), old)
-                    }
-                    pinFor = null; tick++
-                }) { Text("تمام") }
-            },
-            dismissButton = { TextButton(onClick = { pinFor = null }) { Text("إلغاء") } },
-        )
-    }
 }
 
-
-/** ⏳ Focus rules (added from chat), today's usage, delete with PIN. */
+/** Focus rules (added from chat), today's usage, delete with PIN. */
 @Composable
 private fun FocusCard() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -833,17 +670,14 @@ private fun FocusCard() {
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("⏳ وضع التركيز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "قول لـ Nova مثلاً: \"اقفل فيسبوك وتيك توك من ١٢ بالليل لـ ٨ الصبح\" أو \"إنستجرام ساعة في اليوم\".",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (rules.isEmpty()) Text("مفيش قواعد لسه", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("وضع التركيز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (rules.isEmpty()) Text("مفيش قواعد", color = MaterialTheme.colorScheme.onSurfaceVariant)
             rules.forEach { r ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         val on = r.apps.any { it in blocked }
-                        Text((if (on) "🔒 " else "🟢 ") + r.name + ": " + r.labels.joinToString("، "), style = MaterialTheme.typography.bodyMedium)
+                        Text(r.name + ": " + r.labels.joinToString("، "), style = MaterialTheme.typography.bodyMedium,
+                            color = if (on) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
                         Text(
                             listOfNotNull(
                                 r.from?.let { "من $it لحد ${r.to}" },
@@ -859,22 +693,17 @@ private fun FocusCard() {
         }
     }
     deleting?.let { r ->
-        var pin by remember(r) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("شيل \"${r.name}\"؟") },
-            text = {
-                if (com.myassistant.app.admin.DeviceOwner.hasPin(ctx)) OutlinedTextField(pin, { pin = it }, label = { Text("الرقم السري") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                else Text("التطبيقات هترجع تفتح عادي.")
-            },
-            confirmButton = { TextButton(onClick = { msg = F.remove(ctx, r.id.toString(), pin); deleting = null; tick++ }) { Text("شيل") } },
+            text = { Text("التطبيقات هترجع تفتح عادي.") },
+            confirmButton = { TextButton(onClick = { msg = F.remove(ctx, r.id.toString()); deleting = null; tick++ }) { Text("شيل") } },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("إلغاء") } },
         )
     }
 }
 
-/** 🔄 Version + auto update from GitHub. */
+/** Version + auto update from GitHub. */
 @Composable
 private fun UpdateCard() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -887,16 +716,37 @@ private fun UpdateCard() {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("🔄 تحديث تلقائي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("النسخة الحالية: ${U.current(ctx)} · بيدوّر كل ٦ ساعات على الواي فاي", style = MaterialTheme.typography.bodySmall)
+                    Text("تحديث تلقائي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("النسخة ${U.current(ctx)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = auto, onCheckedChange = { auto = it; U.setAuto(ctx, it) })
             }
             OutlinedButton(onClick = {
-                busy = true; status = "⏳ بيدوّر…"
+                busy = true; status = "بيدوّر…"
                 scope.launch { status = U.checkAndInstall(ctx.applicationContext); busy = false }
             }, enabled = !busy) { Text("دوّر على تحديث دلوقتي") }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+
+/** Daily Gmail report: on/off, time, try now. */
+@Composable
+private fun ReportCard(vm: AppViewModel) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("تقرير Gmail اليومي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Switch(checked = vm.reportOn, onCheckedChange = { vm.setReport(it) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = {
+                    android.app.TimePickerDialog(ctx, { _, h, m -> vm.setReport(true, h, m) }, vm.reportHour, vm.reportMinute, false).show()
+                }) { Text("الميعاد: " + String.format(java.util.Locale.US, "%02d:%02d", vm.reportHour, vm.reportMinute)) }
+                TextButton(onClick = { vm.reportNow() }) { Text("جرّب دلوقتي") }
+            }
         }
     }
 }

@@ -13,7 +13,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import java.security.MessageDigest
 
 /** Needed for "device owner" (مالك الجهاز). Enabled once with: adb shell dpm set-device-owner com.myassistant.app/.admin.AdminReceiver */
 class AdminReceiver : DeviceAdminReceiver() {
@@ -28,7 +27,7 @@ data class BlockedApp(val name: String, val pkg: String?)
 /**
  * Full control when the app is the phone's device owner: block installing chosen apps (removed silently if they
  * get in), protect the assistant from being uninstalled, grant its own permissions, suspend apps, lock, reboot.
- * Without device owner, blocking still works through the screen service (closing the store page / uninstall screen).
+ * Blocking is permanent: there is no unblock and no way to give up control from the app.
  */
 object DeviceOwner {
     const val ADB_COMMAND = "adb shell dpm set-device-owner com.myassistant.app/.admin.AdminReceiver"
@@ -38,19 +37,6 @@ object DeviceOwner {
     fun isOwner(ctx: Context) = runCatching { dpm(ctx).isDeviceOwnerApp(ctx.packageName) }.getOrDefault(false)
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("guard", Context.MODE_PRIVATE)
-
-    // ---------- PIN (protects unblocking and removing control) ----------
-
-    private fun hash(pin: String) = MessageDigest.getInstance("SHA-256").digest(("assistant:" + pin).toByteArray())
-        .joinToString("") { "%02x".format(it) }
-
-    fun hasPin(ctx: Context) = prefs(ctx).contains("pin")
-    fun checkPin(ctx: Context, pin: String) = !hasPin(ctx) || prefs(ctx).getString("pin", null) == hash(pin.trim())
-    fun setPin(ctx: Context, old: String, new: String): Boolean {
-        if (!checkPin(ctx, old)) return false
-        prefs(ctx).edit().apply { if (new.isBlank()) remove("pin") else putString("pin", hash(new.trim())) }.apply()
-        return true
-    }
 
     // ---------- block list ----------
 
@@ -143,9 +129,6 @@ object DeviceOwner {
     fun storeNames(b: BlockedApp): List<String> =
         (((b.pkg ?: knownPkg(b.name))?.let { KNOWN[it] }.orEmpty()) + b.name).filter { it.length >= 2 }.distinct()
 
-    /** What the last store-screen check saw (shown in Settings to help debugging). */
-    @Volatile var lastStoreCheck: String = ""
-
     /** Adds an app to the block list and removes it now if it's installed. Returns what happened. */
     fun block(ctx: Context, nameOrPkg: String, pkgHint: String? = null): String {
         val found = findInstalled(ctx, pkgHint ?: nameOrPkg) ?: knownPkg(nameOrPkg)?.let { findInstalled(ctx, it) }
@@ -155,27 +138,7 @@ object DeviceOwner {
         val list = blocked(ctx).filterNot { if (pkg != null) it.pkg == pkg else it.name.equals(name, true) } + BlockedApp(name, pkg)
         save(ctx, list)
         val removed = if (pkg != null && installed(ctx, pkg)) remove(ctx, pkg) else null
-        return buildString {
-            append("✅ \"$name\" بقى ممنوع")
-            when {
-                removed == true -> append("، وكان متسطب فاتشال")
-                removed == false -> append("، وكان متسطب — فتحتلك شاشة الحذف")
-            }
-            if (!isOwner(ctx)) append(". (المنع شغال عن طريق التحكم في الشاشة — لمنع أقوى فعّل مالك الجهاز من الإعدادات)")
-        }
-    }
-
-    fun unblock(ctx: Context, nameOrPkg: String, pin: String): String {
-        if (!checkPin(ctx, pin)) return "❌ الرقم السري غلط"
-        val q = nameOrPkg.trim()
-        val before = blocked(ctx)
-        val after = before.filterNot { it.name.equals(q, true) || it.pkg.equals(q, true) || it.name.contains(q, true) || (knownPkg(q) != null && it.pkg == knownPkg(q)) }
-        if (after.size == before.size) return "مش لاقي \"$q\" في الممنوعين"
-        save(ctx, after)
-        (before - after.toSet()).mapNotNull { it.pkg }.forEach { p ->
-            runCatching { if (isOwner(ctx)) dpm(ctx).setApplicationHidden(admin(ctx), p, false) }
-        }
-        return "✅ شيلت المنع"
+        return "$name اتمنع" + if (removed != null) " واتشال" else ""
     }
 
     private fun installed(ctx: Context, pkg: String) = runCatching {
@@ -228,14 +191,9 @@ object DeviceOwner {
         "Hermit", "Lemur Browser", "Quetta", "Maxthon", "Avast Secure Browser", "AVG Secure Browser", "Aloha Browser",
     )
 
-    fun browsersOnly(ctx: Context) = prefs(ctx).getBoolean("browsers_only", true)
-
-    fun setBrowsersOnly(ctx: Context, on: Boolean, pin: String): Boolean {
-        if (!on && !checkPin(ctx, pin)) return false
-        prefs(ctx).edit().putBoolean("browsers_only", on).apply()
-        if (on) enforce(ctx)
-        return true
-    }
+    /** Always on: other browsers are never allowed. */
+    @Suppress("UNUSED_PARAMETER")
+    fun browsersOnly(ctx: Context) = true
 
     /** Apps that can open any web link = browsers. */
     private fun browserPackages(ctx: Context): Set<String> = runCatching {
@@ -326,12 +284,4 @@ object DeviceOwner {
 
     fun reboot(ctx: Context) = isOwner(ctx) && runCatching { dpm(ctx).reboot(admin(ctx)) }.isSuccess
 
-    /** Gives up device-owner control (PIN protected). */
-    fun release(ctx: Context, pin: String): Boolean {
-        if (!checkPin(ctx, pin) || !isOwner(ctx)) return false
-        val d = dpm(ctx)
-        runCatching { d.setUninstallBlocked(admin(ctx), ctx.packageName, false) }
-        @Suppress("DEPRECATION")
-        return runCatching { d.clearDeviceOwnerApp(ctx.packageName) }.isSuccess
-    }
 }

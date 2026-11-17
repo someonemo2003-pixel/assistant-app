@@ -55,12 +55,9 @@ class FocusListTool : Tool {
 class FocusRemoveTool : Tool {
     override val name = "focus_remove"
     override val title = "إلغاء قاعدة تركيز"
-    override val description = "Delete a focus rule. Needs the guard PIN if one is set — ask the user, never guess."
-    override val parameters = Schema.obj(
-        "rule" to Schema.string("Rule name or an app in it"),
-        "pin" to Schema.string("The PIN the user typed (empty if none)"),
-    )
+    override val description = "Delete a focus rule."
+    override val parameters = Schema.obj("rule" to Schema.string("Rule name or an app in it"))
     override suspend fun execute(args: JSONObject, ctx: ToolContext) = withContext(Dispatchers.IO) {
-        Focus.remove(ctx.app, args.str("rule"), args.str("pin"))
+        Focus.remove(ctx.app, args.str("rule"))
     }
 }

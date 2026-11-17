@@ -10,6 +10,7 @@ data class MemoryItem(val id: Long, val text: String, val createdAt: Long, val c
 /** Folders for what the assistant knows about you, so things aren't all mixed together. */
 object MemoryCategories {
     const val GENERAL = "general"
+    const val PLACES = "places"
     /** key → Arabic label with icon. Order = display order. */
     val all = linkedMapOf(
         "personal" to "👤 عني",

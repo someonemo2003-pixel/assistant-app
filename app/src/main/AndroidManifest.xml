@@ -169,6 +169,11 @@
         </receiver>
 
         <service
+            android:name=".places.PlaceService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <service
             android:name=".health.WalkService"
             android:exported="false"
             android:foregroundServiceType="location" />

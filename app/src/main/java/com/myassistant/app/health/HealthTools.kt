@@ -1,8 +1,6 @@
 package com.myassistant.app.health
 
 import android.Manifest
-import android.location.Geocoder
-import android.location.Location
 import android.os.Build
 import com.myassistant.app.tools.Schema
 import com.myassistant.app.tools.Tool
@@ -83,11 +81,8 @@ class WalkTool : Tool {
                 kotlinx.coroutines.delay(800)
                 val w = withContext(Dispatchers.IO) { ActivityStore.get(ctx.app).walks(5).firstOrNull { it.id == id } }
                 if (w != null) {
-                    val pts = withContext(Dispatchers.IO) { ActivityStore.get(ctx.app).points(0, 0, w.id) }
-                    val shown = GoogleMaps.openRoute(ctx.app, pts)
                     "Walk saved: ${String.format(Locale.US, "%.2f", w.meters / 1000)} km, ${w.steps} steps, " +
-                        "${((w.end ?: System.currentTimeMillis()) - w.start) / 60000} min." +
-                        if (shown) " The route is now open in Google Maps." else ""
+                        "${((w.end ?: System.currentTimeMillis()) - w.start) / 60000} min."
                 } else "Walk stopped"
             }
         }
@@ -95,84 +90,23 @@ class WalkTool : Tool {
     }
 }
 
-class ShowRouteTool : Tool {
-    override val name = "show_route"
-    override val title = "خريطة"
-    override val description =
-        "Open Google Maps with the route the user went: a day (today/yesterday/yyyy-MM-dd), optionally a time window, or the last tracked walk."
-    override val parameters = Schema.obj(
-        "day" to Schema.string("today | yesterday | yyyy-MM-dd | last_walk"),
-        "from_hour" to Schema.integer("Optional start hour 0-23"),
-        "to_hour" to Schema.integer("Optional end hour 0-23"),
-    )
-
-    override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        val store = ActivityStore.get(ctx.app)
-        if (args.str("day") == "last_walk") {
-            val w = withContext(Dispatchers.IO) { store.walks(1).firstOrNull() } ?: return "No tracked walks yet"
-            val pts = withContext(Dispatchers.IO) { store.points(0, 0, w.id) }
-            if (!GoogleMaps.openRoute(ctx.app, pts)) return "That walk has no saved points"
-            return "Opened the last walk in Google Maps (${String.format(Locale.US, "%.2f", w.meters / 1000)} km)."
-        }
-        var (from, to) = dayRange(args.str("day")) ?: return "Bad day; use today, yesterday or yyyy-MM-dd"
-        val dayBegin = from
-        if (args.has("from_hour")) from = dayBegin + args.optInt("from_hour") * 3_600_000L
-        if (args.has("to_hour")) to = dayBegin + args.optInt("to_hour") * 3_600_000L
-        val pts = withContext(Dispatchers.IO) { store.points(from, to) }
-        if (pts.isEmpty()) return "No location history for that time (all-day tracking may be off or 'allow all the time' location not granted)."
-        GoogleMaps.openRoute(ctx.app, pts, if (ActivityStore.distance(pts) > 5_000) "driving" else "walking")
-        return "Opened the route in Google Maps: ${pts.size} points, ≈ ${String.format(Locale.US, "%.1f", ActivityStore.distance(pts) / 1000)} km moved."
-    }
-}
-
 class PlacesTool : Tool {
     override val name = "places_visited"
     override val title = "الأماكن"
     override val description =
-        "Where the user was and for how long on a day (from the phone's own location history): list of stops with times and addresses."
-    override val parameters = Schema.obj("day" to Schema.string("today | yesterday | yyyy-MM-dd"))
+        "Where the user went on a day and when: saved places by name (البيت، الشغل…) and other spots where they stayed " +
+            "15+ minutes. A day runs from 3 AM to 3 AM."
+    override val parameters = Schema.obj("day" to Schema.string("today | yesterday | number of days ago (0-30)"))
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String = withContext(Dispatchers.IO) {
-        val (from, to) = dayRange(args.str("day")) ?: return@withContext "Bad day"
-        val pts = ActivityStore.get(ctx.app).points(from, to).filter { it.accuracy <= 150f }
-        if (pts.isEmpty()) return@withContext "No location history for that day"
-        val stays = stays(pts)
-        if (stays.isEmpty()) return@withContext "Moving all day, no long stops"
-        val fmt = SimpleDateFormat("HH:mm", Locale.US)
-        val geo = runCatching { Geocoder(ctx.app, Locale("ar")) }.getOrNull()
-        stays.joinToString("\n") { s ->
-            @Suppress("DEPRECATION")
-            val addr = runCatching { geo?.getFromLocation(s.lat, s.lng, 1)?.firstOrNull()?.getAddressLine(0) }.getOrNull()
-            "${fmt.format(Date(s.start))}–${fmt.format(Date(s.end))} (${(s.end - s.start) / 60000} min): " +
-                (addr ?: "%.5f, %.5f".format(Locale.US, s.lat, s.lng))
+        val d = when (val v = args.str("day").lowercase()) {
+            "", "today", "النهارده" -> 0
+            "yesterday", "امبارح" -> 1
+            else -> v.toIntOrNull()?.coerceIn(0, 30) ?: 0
         }
-    }
-
-    private data class Stay(val start: Long, val end: Long, val lat: Double, val lng: Double)
-
-    /** Groups points that stay within ~150 m for 10+ minutes. */
-    private fun stays(points: List<GeoPoint>): List<Stay> {
-        val out = mutableListOf<Stay>()
-        var group = mutableListOf(points.first())
-        val d = FloatArray(1)
-        for (p in points.drop(1)) {
-            val c = group.first()
-            Location.distanceBetween(c.lat, c.lng, p.lat, p.lng, d)
-            if (d[0] <= 150f) group += p else {
-                flush(group, out); group = mutableListOf(p)
-            }
-        }
-        flush(group, out)
-        return out
-    }
-
-    private fun flush(g: List<GeoPoint>, out: MutableList<Stay>) {
-        if (g.last().time - g.first().time >= 10 * 60_000L) {
-            out += Stay(g.first().time, g.last().time, g.map { it.lat }.average(), g.map { it.lng }.average())
-        }
+        com.myassistant.app.places.PlaceTracker.timeline(ctx.app, d).ifEmpty { "No places logged for that day" }
     }
 }
-
 
 class NavigateTool : Tool {
     override val name = "navigate"

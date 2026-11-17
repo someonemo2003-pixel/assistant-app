@@ -80,8 +80,7 @@ object Focus {
         }
     }
 
-    fun remove(ctx: Context, nameOrId: String, pin: String): String {
-        if (!DeviceOwner.checkPin(ctx, pin)) return "❌ الرقم السري غلط"
+    fun remove(ctx: Context, nameOrId: String): String {
         val q = nameOrId.trim()
         val before = rules(ctx)
         val after = before.filterNot { it.name.contains(q, true) || it.id.toString() == q || it.labels.any { l -> l.equals(q, true) } }

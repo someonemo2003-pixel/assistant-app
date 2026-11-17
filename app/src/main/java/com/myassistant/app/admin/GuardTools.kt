@@ -10,8 +10,8 @@ class BlockAppTool : Tool {
     override val name = "block_app"
     override val title = "منع برنامج"
     override val description =
-        "Block an app from being installed on this phone (removes it now if it's installed, closes its store page, removes it " +
-            "again if it gets installed). Give the app name as the user said it, and its Android package if you know it " +
+        "Block an app on this phone for good (removes it now if installed, covers its install button in the store, removes it " +
+            "again if it gets installed). Blocking is permanent: there is no unblock — tell the user so if they ask to undo it. Give the app name as the user said it, and its Android package if you know it " +
             "(e.g. TikTok = com.zhiliaoapp.musically)."
     override val parameters = Schema.obj(
         "app" to Schema.string("App name, e.g. TikTok"),
@@ -19,18 +19,6 @@ class BlockAppTool : Tool {
     )
     override suspend fun execute(args: JSONObject, ctx: ToolContext) =
         DeviceOwner.block(ctx.app, args.str("app"), args.str("package").ifBlank { null })
-}
-
-class UnblockAppTool : Tool {
-    override val name = "unblock_app"
-    override val title = "إلغاء منع برنامج"
-    override val description = "Remove an app from the block list. Needs the user's guard PIN if one is set — ask the user for it, never guess."
-    override val parameters = Schema.obj(
-        "app" to Schema.string("App name or package"),
-        "pin" to Schema.string("The guard PIN the user typed (empty if none set)"),
-    )
-    override suspend fun execute(args: JSONObject, ctx: ToolContext) =
-        DeviceOwner.unblock(ctx.app, args.str("app"), args.str("pin"))
 }
 
 class ListBlockedTool : Tool {

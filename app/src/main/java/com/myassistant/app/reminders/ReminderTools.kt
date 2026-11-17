@@ -95,14 +95,30 @@ class CancelReminderTool : Tool {
 class SavePlaceTool : Tool {
     override val name = "save_place"
     override val title = "حفظ مكان"
-    override val description = "Save the user's CURRENT location under a name (e.g. البيت, الشغل, الجيم) for place reminders."
-    override val parameters = Schema.obj("name" to Schema.string("Place name"), required = listOf("name"))
+    override val description =
+        "Save where the user is NOW under a name (\"سجل المكان ده باسم الشغل\"). Nova then knows whenever the user is there " +
+            "(daily places log) and it can be used for place reminders. Optional radius in metres for big places " +
+            "(default 100; e.g. 300 for a university or a mall)."
+    override val parameters = Schema.obj(
+        "name" to Schema.string("Place name"),
+        "radius" to Schema.integer("Optional size in metres (default 100)"),
+        required = listOf("name"),
+    )
     override val permissions = listOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
         val name = args.str("name").ifEmpty { return "Missing name" }
         val loc = Health.currentLocation(ctx.app) ?: return "Could not get the current location (turn on location/GPS)"
-        withContext(Dispatchers.IO) { ReminderStore.get(ctx.app).savePlace(SavedPlace(name, loc.latitude, loc.longitude)) }
-        return "Saved \"$name\" at your current location (±${loc.accuracy.toInt()} m)"
+        if (loc.accuracy > 150f) return "Location is too vague right now (±${loc.accuracy.toInt()} m). Ask the user to turn on GPS / Wi-Fi and try again."
+        val radius = (args.int("radius") ?: com.myassistant.app.places.PlaceTracker.DEFAULT_RADIUS).coerceIn(30, 1000)
+        withContext(Dispatchers.IO) {
+            com.myassistant.app.places.PlaceTracker.savePlace(ctx.app, name, loc.latitude, loc.longitude, radius)
+            // Keep it in memory too, under places.
+            val mem = ctx.memory
+            if (mem.search(name, 20).none { it.category == com.myassistant.app.memory.MemoryCategories.PLACES && it.text.contains(name) }) {
+                mem.add("مكان محفوظ: $name", com.myassistant.app.memory.MemoryCategories.PLACES)
+            }
+        }
+        return "Saved \"$name\" (±${loc.accuracy.toInt()} m, radius $radius m)"
     }
 }

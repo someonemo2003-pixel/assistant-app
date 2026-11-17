@@ -56,40 +56,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var job: Job? = null
 
-    val walking = com.myassistant.app.health.WalkService.running
-    fun toggleWalk() {
-        viewModelScope.launch {
-            val ctx = getApplication<Application>()
-            if (com.myassistant.app.health.WalkService.running.value) com.myassistant.app.health.WalkService.stop(ctx)
-            else com.myassistant.app.health.WalkService.start(ctx)
-        }
-    }
-    var lightTracking by mutableStateOf(com.myassistant.app.health.Health.lightTrackingOn(app))
-        private set
-    fun changeLightTracking(on: Boolean) {
-        lightTracking = on
-        com.myassistant.app.health.Health.setLightTracking(getApplication(), on)
-    }
-    fun clearPlaces() {
-        viewModelScope.launch(Dispatchers.IO) { com.myassistant.app.health.ActivityStore.get(getApplication()).clearPlaces() }
-        notice = "اتمسح سجل الأماكن"
-    }
-    /** Opens today's path in Google Maps. */
-    fun openMap() {
-        viewModelScope.launch {
-            val ctx = getApplication<Application>()
-            val start = java.util.Calendar.getInstance().apply {
-                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0)
-            }.timeInMillis
-            val pts = withContext(Dispatchers.IO) {
-                com.myassistant.app.health.ActivityStore.get(ctx).points(start, System.currentTimeMillis())
-            }
-            if (pts.isEmpty()) notice = "مفيش أماكن متسجلة النهارده — فعّل تسجيل الأماكن من الإعدادات"
-            else com.myassistant.app.health.GoogleMaps.openRoute(ctx, pts,
-                if (com.myassistant.app.health.ActivityStore.distance(pts) > 5_000) "driving" else "walking")
-        }
-    }
-
     // ---- Voice ----
 
     val listener = com.myassistant.app.voice.Listener(app)

@@ -117,12 +117,12 @@ class ScreenService : AccessibilityService() {
             return
         }
 
-        // 2) Someone trying to uninstall the assistant while a PIN is set.
-        if (("packageinstaller" in pkg || "permissioncontroller" in pkg) && com.myassistant.app.admin.DeviceOwner.hasPin(this) &&
+        // 2) Someone trying to uninstall the assistant.
+        if (("packageinstaller" in pkg || "permissioncontroller" in pkg) &&
             (all.contains("Nova") || all.contains("مساعدي")) && Regex("إلغاء التثبيت|uninstall|حذف التطبيق|إزالة التطبيق|إلغاء تثبيت", RegexOption.IGNORE_CASE).containsMatchIn(all)
         ) {
             performGlobalAction(GLOBAL_ACTION_BACK)
-            toast("🔒 Nova محمي — شيل الحماية من الإعدادات بالرقم السري")
+            toast("Nova محمي")
             return
         }
 
@@ -181,12 +181,10 @@ class ScreenService : AccessibilityService() {
         val cancels = exact(root, cancelWords)
         val toCover = ArrayList<Rect>()
         var hitName: String? = null
-        val seen = ArrayList<String>()
         for (b in blocked) {
             val names = com.myassistant.app.admin.DeviceOwner.storeNames(b)
             val onScreen = names.filter { name -> root.findAccessibilityNodeInfosByText(name).any { isTitle(nodeLabel(it), name) } }
             if (onScreen.isEmpty()) continue
-            seen += b.name
             for (btn in buttons) {
                 ownerCard(btn, onScreen) ?: continue
                 val r = Rect(); btn.getBoundsInScreen(r)
@@ -200,10 +198,6 @@ class ScreenService : AccessibilityService() {
                 }
             }
         }
-        com.myassistant.app.admin.DeviceOwner.lastStoreCheck =
-            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date()) +
-                " · ${root.packageName} · أزرار تثبيت: ${buttons.size} (${buttons.joinToString { nodeLabel(it) }})" +
-                " · ممنوع ظاهر: ${seen.ifEmpty { listOf("لا") }.joinToString()} · اتغطى: ${toCover.size}"
         handler.post { showCovers(toCover, hitName) }
     }
 

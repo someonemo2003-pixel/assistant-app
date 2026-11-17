@@ -38,20 +38,22 @@ data class Reminder(
     val isPlace get() = place != null
 }
 
-data class SavedPlace(val name: String, val lat: Double, val lng: Double)
+data class SavedPlace(val name: String, val lat: Double, val lng: Double, val radius: Int = 100)
 
 /** Reminders and saved places, stored on the phone. Blocking — use from IO. */
-class ReminderStore private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "reminders.db", null, 1) {
+class ReminderStore private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "reminders.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, at INTEGER NOT NULL DEFAULT 0, " +
                 "repeat TEXT NOT NULL DEFAULT 'none', place TEXT, lat REAL, lng REAL, event TEXT, done INTEGER NOT NULL DEFAULT 0)",
         )
-        db.execSQL("CREATE TABLE places (name TEXT PRIMARY KEY, lat REAL NOT NULL, lng REAL NOT NULL)")
+        db.execSQL("CREATE TABLE places (name TEXT PRIMARY KEY, lat REAL NOT NULL, lng REAL NOT NULL, radius INTEGER NOT NULL DEFAULT 100)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL("ALTER TABLE places ADD COLUMN radius INTEGER NOT NULL DEFAULT 100")
+    }
 
     fun add(text: String, at: Long, repeat: String, place: SavedPlace?, event: String?): Long =
         writableDatabase.insert("reminders", null, ContentValues().apply {
@@ -69,7 +71,7 @@ class ReminderStore private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "r
 
     fun savePlace(p: SavedPlace) {
         writableDatabase.insertWithOnConflict("places", null, ContentValues().apply {
-            put("name", p.name.trim()); put("lat", p.lat); put("lng", p.lng)
+            put("name", p.name.trim()); put("lat", p.lat); put("lng", p.lng); put("radius", p.radius)
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
@@ -79,8 +81,8 @@ class ReminderStore private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "r
             ?: places().firstOrNull { it.name.removePrefix("ال").equals(n, true) || it.name.contains(n, true) }
     }
 
-    fun places(): List<SavedPlace> = readableDatabase.rawQuery("SELECT name, lat, lng FROM places ORDER BY name", null).use { c ->
-        buildList { while (c.moveToNext()) add(SavedPlace(c.getString(0), c.getDouble(1), c.getDouble(2))) }
+    fun places(): List<SavedPlace> = readableDatabase.rawQuery("SELECT name, lat, lng, radius FROM places ORDER BY name", null).use { c ->
+        buildList { while (c.moveToNext()) add(SavedPlace(c.getString(0), c.getDouble(1), c.getDouble(2), c.getInt(3))) }
     }
 
     fun deletePlace(name: String) = writableDatabase.execSQL("DELETE FROM places WHERE name = ?", arrayOf<Any>(name))
@@ -217,6 +219,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 runCatching { com.myassistant.app.health.Health.schedule(ctx) }
                 runCatching { com.myassistant.app.mail.DailyReport.schedule(ctx) }
                 runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
+                runCatching { com.myassistant.app.places.PlaceTracker.start(ctx) }
             }
             "time" -> {
                 val r = store.get(intent.getLongExtra("id", -1)) ?: return

@@ -15,7 +15,7 @@ import java.util.zip.ZipOutputStream
  */
 object Backup {
     private val databases = listOf(
-        "memory.db", "chats.db", "experience.db", "notifications.db", "activity.db", "reminders.db", "expenses.db",
+        "memory.db", "chats.db", "experience.db", "notifications.db", "activity.db", "reminders.db", "expenses.db", "visits.db",
     )
     private val prefs = listOf("settings", "providers", "mail", "report", "health", "expenses", "accounts", "guard", "focus", "updates")
 

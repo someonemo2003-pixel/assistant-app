@@ -44,14 +44,7 @@ object Health {
 
     fun granted(ctx: Context, p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
 
-    fun lightTrackingOn(ctx: Context) = ctx.getSharedPreferences("health", Context.MODE_PRIVATE).getBoolean("light", true)
-
-    fun setLightTracking(ctx: Context, on: Boolean) {
-        ctx.getSharedPreferences("health", Context.MODE_PRIVATE).edit().putBoolean("light", on).apply()
-        schedule(ctx)
-    }
-
-    /** Every ~15 minutes: save a step-counter sample and (if allowed) where the phone is. */
+    /** Every ~15 minutes: save a step-counter sample and make sure place tracking is running. */
     fun schedule(ctx: Context) {
         val req = PeriodicWorkRequestBuilder<SampleWorker>(15, TimeUnit.MINUTES).build()
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(LIGHT_WORK, ExistingPeriodicWorkPolicy.UPDATE, req)
@@ -103,11 +96,7 @@ class SampleWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         runCatching { com.myassistant.app.admin.DeviceOwner.enforce(ctx) }
         runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
         runCatching { withContext(Dispatchers.IO) { com.myassistant.app.finance.ExpenseSync.scanSms(ctx) } }
-        if (Health.lightTrackingOn(ctx) && !WalkService.running.value &&
-            (Build.VERSION.SDK_INT < 29 || Health.granted(ctx, Manifest.permission.ACCESS_BACKGROUND_LOCATION))
-        ) {
-            Health.currentLocation(ctx)?.let { loc -> withContext(Dispatchers.IO) { ActivityStore.get(ctx).addPoint(loc, null) } }
-        }
+        runCatching { com.myassistant.app.places.PlaceTracker.start(ctx) } // restarts it if the system stopped it
         return Result.success()
     }
 }
