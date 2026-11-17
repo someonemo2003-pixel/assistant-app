@@ -216,6 +216,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 ReminderScheduler.rescheduleAll(ctx)
                 runCatching { com.myassistant.app.health.Health.schedule(ctx) }
                 runCatching { com.myassistant.app.mail.DailyReport.schedule(ctx) }
+                runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
             }
             "time" -> {
                 val r = store.get(intent.getLongExtra("id", -1)) ?: return

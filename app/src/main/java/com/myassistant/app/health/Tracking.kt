@@ -101,6 +101,7 @@ class SampleWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val ctx = applicationContext
         runCatching { Health.sampleSteps(ctx) }
         runCatching { com.myassistant.app.admin.DeviceOwner.enforce(ctx) }
+        runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
         runCatching { withContext(Dispatchers.IO) { com.myassistant.app.finance.ExpenseSync.scanSms(ctx) } }
         if (Health.lightTrackingOn(ctx) && !WalkService.running.value &&
             (Build.VERSION.SDK_INT < 29 || Health.granted(ctx, Manifest.permission.ACCESS_BACKGROUND_LOCATION))

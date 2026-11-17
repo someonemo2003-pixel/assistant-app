@@ -41,7 +41,25 @@ class ScreenService : AccessibilityService() {
     private var lastGuardAt = 0L
 
     /** Blocked apps: leave their store/installer page; confirm uninstalls we asked for; protect ourselves. */
+    private var lastFocusAt = 0L
+
+    /** Focus mode: leave apps that are blocked right now (backup for when we're not device owner). */
+    private fun focusGuard(event: AccessibilityEvent) {
+        val pkg = event.packageName?.toString() ?: return
+        if (pkg == packageName || pkg == "com.android.systemui") return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastFocusAt < 1500) return
+        val blocked = com.myassistant.app.focus.Focus.blockedCached(this)
+        val why = blocked[pkg] ?: return
+        lastFocusAt = now
+        // A limit may have just been reached: make it stick (suspend) when we can.
+        if (com.myassistant.app.admin.DeviceOwner.isOwner(this)) Thread { com.myassistant.app.focus.Focus.apply(applicationContext) }.start()
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        toast("⏳ $why")
+    }
+
     private fun guard(event: AccessibilityEvent) {
+        runCatching { focusGuard(event) }
         val pkg = event.packageName?.toString() ?: return
         val isStore = pkg in com.myassistant.app.admin.DeviceOwner.STORE_PKGS || "packageinstaller" in pkg || "permissioncontroller" in pkg
         if (!isStore) return

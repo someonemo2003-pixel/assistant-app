@@ -17,7 +17,7 @@ object Backup {
     private val databases = listOf(
         "memory.db", "chats.db", "experience.db", "notifications.db", "activity.db", "reminders.db", "expenses.db",
     )
-    private val prefs = listOf("settings", "providers", "mail", "report", "health", "expenses", "accounts", "guard")
+    private val prefs = listOf("settings", "providers", "mail", "report", "health", "expenses", "accounts", "guard", "focus", "updates")
 
     fun export(ctx: Context, target: Uri): Int {
         var count = 0

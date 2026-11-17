@@ -229,7 +229,9 @@ fun SettingsScreen(vm: AppViewModel) {
                     onEdit = { editing = c },
                 )
             }
+            item { FocusCard() }
             item { GuardCard() }
+            item { UpdateCard() }
             item { BackupCard(vm) }
             item {
                 OutlinedButton(
@@ -793,5 +795,88 @@ private fun GuardCard() {
             },
             dismissButton = { TextButton(onClick = { pinFor = null }) { Text("إلغاء") } },
         )
+    }
+}
+
+
+/** ⏳ Focus rules (added from chat), today's usage, delete with PIN. */
+@Composable
+private fun FocusCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val F = com.myassistant.app.focus.Focus
+    var tick by remember { mutableStateOf(0) }
+    val rules = remember(tick) { F.rules(ctx) }
+    val usage = remember(tick) { F.usageToday(ctx, rules.flatMap { it.apps }) }
+    val blocked = remember(tick) { F.blockedNow(ctx) }
+    var deleting by remember { mutableStateOf<com.myassistant.app.focus.FocusRule?>(null) }
+    var msg by remember { mutableStateOf<String?>(null) }
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("⏳ وضع التركيز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "قول لـ Nova مثلاً: \"اقفل فيسبوك وتيك توك من ١٢ بالليل لـ ٨ الصبح\" أو \"إنستجرام ساعة في اليوم\".",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (rules.isEmpty()) Text("مفيش قواعد لسه", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            rules.forEach { r ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        val on = r.apps.any { it in blocked }
+                        Text((if (on) "🔒 " else "🟢 ") + r.name + ": " + r.labels.joinToString("، "), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            listOfNotNull(
+                                r.from?.let { "من $it لحد ${r.to}" },
+                                if (r.limitMin > 0) "${r.apps.sumOf { usage[it] ?: 0 }} من ${r.limitMin} دقيقة النهارده" else null,
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = { deleting = r }) { Text("شيل") }
+                }
+            }
+            msg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+    deleting?.let { r ->
+        var pin by remember(r) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("شيل \"${r.name}\"؟") },
+            text = {
+                if (com.myassistant.app.admin.DeviceOwner.hasPin(ctx)) OutlinedTextField(pin, { pin = it }, label = { Text("الرقم السري") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                else Text("التطبيقات هترجع تفتح عادي.")
+            },
+            confirmButton = { TextButton(onClick = { msg = F.remove(ctx, r.id.toString(), pin); deleting = null; tick++ }) { Text("شيل") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("إلغاء") } },
+        )
+    }
+}
+
+/** 🔄 Version + auto update from GitHub. */
+@Composable
+private fun UpdateCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val U = com.myassistant.app.update.Updater
+    var auto by remember { mutableStateOf(U.autoOn(ctx)) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("🔄 تحديث تلقائي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("النسخة الحالية: ${U.current(ctx)} · بيدوّر كل ٦ ساعات على الواي فاي", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = auto, onCheckedChange = { auto = it; U.setAuto(ctx, it) })
+            }
+            OutlinedButton(onClick = {
+                busy = true; status = "⏳ بيدوّر…"
+                scope.launch { status = U.checkAndInstall(ctx.applicationContext); busy = false }
+            }, enabled = !busy) { Text("دوّر على تحديث دلوقتي") }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
     }
 }
