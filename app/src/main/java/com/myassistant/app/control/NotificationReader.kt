@@ -1,83 +1,166 @@
 package com.myassistant.app.control
 
+import android.Manifest
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.RemoteInput
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.myassistant.app.tools.Schema
-import com.myassistant.app.tools.Tool
-import com.myassistant.app.tools.ToolContext
-import com.myassistant.app.tools.int
-import com.myassistant.app.tools.str
-import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import com.myassistant.app.MainActivity
+import java.lang.ref.WeakReference
 
-data class SeenNotification(val app: String, val pkg: String, val title: String, val text: String, val time: Long)
-
-/** Keeps the recent notifications (WhatsApp messages, emails, ...) so the assistant can read them. */
+/**
+ * Reads every notification (WhatsApp, Messenger, Telegram, SMS, Gmail and other email apps, ...),
+ * saves it on the phone, raises the user's custom alerts, and can reply / dismiss / mark as read.
+ */
 class NotificationReader : NotificationListenerService() {
 
+    private val store by lazy { NotificationStore.get(this) }
+
     override fun onListenerConnected() {
-        connected = true
-        runCatching { activeNotifications?.forEach { remember(it) } }
+        instance = WeakReference(this)
+        runCatching { activeNotifications?.forEach { handle(it, alert = false) } }
     }
 
     override fun onListenerDisconnected() {
-        connected = false
+        if (instance?.get() === this) instance = null
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        sbn?.let { remember(it) }
+        sbn?.let { runCatching { handle(it, alert = true) } }
     }
 
-    private fun remember(sbn: StatusBarNotification) {
+    private fun handle(sbn: StatusBarNotification, alert: Boolean) {
         if (sbn.packageName == packageName) return
-        val extras = sbn.notification?.extras ?: return
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))
-            ?.toString().orEmpty()
-        if (title.isBlank() && text.isBlank()) return
-        val app = runCatching {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
-        }.getOrDefault(sbn.packageName)
-        synchronized(recent) {
-            recent.removeAll { it.pkg == sbn.packageName && it.title == title && it.text == text }
-            recent.addFirst(SeenNotification(app, sbn.packageName, title, text.take(500), sbn.postTime))
-            while (recent.size > 200) recent.removeLast()
+        val n = sbn.notification ?: return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = n.extras ?: return
+        val app = appLabel(sbn.packageName)
+        val isEmail = n.category == Notification.CATEGORY_EMAIL || sbn.packageName in EMAIL_APPS
+        val fresh = mutableListOf<SavedNotification>()
+
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+        if (style != null && style.messages.isNotEmpty()) {
+            val conv = style.conversationTitle?.toString()
+                ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+            for (m in style.messages) {
+                val text = m.text?.toString()?.trim().orEmpty()
+                if (text.isEmpty()) continue
+                val sender = m.person?.name?.toString() ?: conv
+                val item = SavedNotification(0, sbn.key, sbn.packageName, app, conv, sender, text.take(1500), m.timestamp, isEmail, true)
+                if (store.save(item)) fresh += item
+            }
+        } else {
+            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
+            val sub = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim().orEmpty()
+            val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.map { it.toString() }.orEmpty()
+            val body = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))
+                ?.toString()?.trim().orEmpty()
+            val texts = if (lines.isNotEmpty() && body.isEmpty()) lines else listOf(body)
+            val isMessage = n.category == Notification.CATEGORY_MESSAGE || sbn.packageName in MESSAGE_APPS
+            for (t in texts) {
+                if (title.isEmpty() && t.isEmpty()) continue
+                val item = SavedNotification(0, sbn.key, sbn.packageName, app, sub, title, t.take(1500), sbn.postTime, isEmail, isMessage)
+                if (store.save(item)) fresh += item
+            }
+        }
+        if (alert && fresh.isNotEmpty()) checkAlerts(fresh)
+    }
+
+    private fun checkAlerts(items: List<SavedNotification>) {
+        val rules = store.alerts()
+        if (rules.isEmpty()) return
+        for (item in items) {
+            val rule = rules.firstOrNull { r ->
+                (r.app.isEmpty() || item.app.contains(r.app, ignoreCase = true)) &&
+                    listOf(item.sender, item.conversation, item.text).any { it.contains(r.match, ignoreCase = true) }
+            } ?: continue
+            postAlert("🔔 ${item.sender.ifEmpty { item.app }} (${item.app})", item.text, rule.match)
         }
     }
+
+    private fun postAlert(title: String, text: String, rule: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val nm = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ALERT_CHANNEL) == null) {
+            nm.createNotificationChannel(NotificationChannel(ALERT_CHANNEL, "تنبيهات مهمة", NotificationManager.IMPORTANCE_HIGH))
+        }
+        val open = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val notif = NotificationCompat.Builder(this, ALERT_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setSubText("تنبيه: $rule")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(this).notify((System.nanoTime() % Int.MAX_VALUE).toInt(), notif) }
+    }
+
+    private fun appLabel(pkg: String) = runCatching {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    }.getOrDefault(pkg)
+
+    // ---------- actions on live notifications ----------
+
+    fun live(): List<StatusBarNotification> = runCatching { activeNotifications?.toList() }.getOrNull().orEmpty()
+        .filter { it.packageName != packageName }
+
+    /** Replies through the notification's own "Reply" box. */
+    fun reply(sbn: StatusBarNotification, message: String): Boolean {
+        val action = sbn.notification.actions?.firstOrNull { a ->
+            a.remoteInputs?.any { it.allowFreeFormInput } == true
+        } ?: return false
+        val intent = Intent()
+        val results = Bundle()
+        action.remoteInputs.filter { it.allowFreeFormInput }.forEach { results.putCharSequence(it.resultKey, message) }
+        RemoteInput.addResultsToIntent(action.remoteInputs, intent, results)
+        return runCatching { action.actionIntent.send(this, 0, intent); true }.getOrDefault(false)
+    }
+
+    fun markRead(sbn: StatusBarNotification): Boolean {
+        val action = sbn.notification.actions?.firstOrNull { a ->
+            (Build.VERSION.SDK_INT >= 28 && a.semanticAction == Notification.Action.SEMANTIC_ACTION_MARK_AS_READ) ||
+                a.title?.toString()?.lowercase()?.let { t -> "read" in t || "مقروء" in t || "قراءة" in t } == true
+        } ?: return false
+        return runCatching { action.actionIntent.send(); true }.getOrDefault(false)
+    }
+
+    fun dismiss(sbn: StatusBarNotification) = runCatching { cancelNotification(sbn.key) }.isSuccess
 
     companion object {
-        @Volatile var connected = false
-            private set
-        private val recent = ArrayDeque<SeenNotification>()
+        private const val ALERT_CHANNEL = "alerts"
+        @Volatile private var instance: WeakReference<NotificationReader>? = null
+        val current: NotificationReader? get() = instance?.get()
 
-        fun snapshot(): List<SeenNotification> = synchronized(recent) { recent.toList() }
-    }
-}
+        val EMAIL_APPS = setOf(
+            "com.google.android.gm", "com.microsoft.office.outlook", "com.yahoo.mobile.client.android.mail",
+            "com.samsung.android.email.provider", "com.android.email", "com.huawei.email", "com.hihonor.email",
+            "me.bluemail.mail", "ch.protonmail.android", "com.readdle.spark", "com.easilydo.mail", "com.google.android.apps.inbox",
+        )
+        val MESSAGE_APPS = setOf(
+            "com.whatsapp", "com.whatsapp.w4b", "com.facebook.orca", "org.telegram.messenger", "com.instagram.android",
+            "com.google.android.apps.messaging", "com.android.mms", "com.hihonor.mms", "com.huawei.message",
+            "com.viber.voip", "com.snapchat.android", "com.discord", "com.Slack", "com.microsoft.teams",
+        )
 
-class ReadNotificationsTool : Tool {
-    override val name = "read_notifications"
-    override val title = "الإشعارات"
-    override val description =
-        "Read the user's recent notifications (messages from WhatsApp/Messenger/SMS, emails, app alerts). " +
-            "Optionally filter by app name or sender."
-    override val parameters = Schema.obj(
-        "filter" to Schema.string("Optional app name or sender to filter by"),
-        "limit" to Schema.integer("How many, default 15"),
-    )
-
-    override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        if (!NotificationReader.connected && NotificationReader.snapshot().isEmpty()) {
-            return "Notification access is OFF. Tell the user: ⚙️ → الصلاحيات → قراءة الإشعارات."
-        }
-        val f = args.str("filter").lowercase()
-        val list = NotificationReader.snapshot()
-            .filter { f.isEmpty() || it.app.lowercase().contains(f) || it.title.lowercase().contains(f) || it.pkg.contains(f) }
-            .take((args.int("limit") ?: 15).coerceIn(1, 50))
-        if (list.isEmpty()) return "No matching notifications"
-        val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.US)
-        return list.joinToString("\n") { "[${fmt.format(Date(it.time))}] ${it.app} · ${it.title}: ${it.text}" }
+        fun isEnabled(ctx: Context) = NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
     }
 }

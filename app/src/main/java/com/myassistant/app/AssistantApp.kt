@@ -15,7 +15,11 @@ import com.myassistant.app.security.SecretStore
 import com.myassistant.app.semantic.MeaningModel
 import com.myassistant.app.semantic.Recall
 import com.myassistant.app.control.PhoneButtonTool
+import com.myassistant.app.control.ClearNotificationsTool
+import com.myassistant.app.control.MissedMessagesTool
+import com.myassistant.app.control.NotificationAlertTool
 import com.myassistant.app.control.ReadNotificationsTool
+import com.myassistant.app.control.ReplyNotificationTool
 import com.myassistant.app.control.ReadScreenTool
 import com.myassistant.app.control.ScrollTool
 import com.myassistant.app.control.TapTool
@@ -86,7 +90,8 @@ class AppGraph(context: Context) {
         // screen control
         ReadScreenTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(),
         // phone data
-        ReadNotificationsTool(), FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
+        ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), ClearNotificationsTool(), NotificationAlertTool(),
+        FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
         ListEventsTool(), AddEventTool(), LocationTool(),
         ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
         // device

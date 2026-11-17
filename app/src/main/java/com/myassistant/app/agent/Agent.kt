@@ -123,6 +123,7 @@ class Agent(
             appendLine("- Prefer doing things with your tools over explaining how to do them.")
             appendLine("- When the user shares a lasting fact about themselves, save it with the remember tool.")
             appendLine("- If the user asks about something from earlier conversations, use search_chats.")
+            appendLine("- Messages and emails (Gmail etc.) that reached the phone are in its notifications: use read_notifications / missed_messages; reply with reply_message.")
             appendLine("- If the user teaches a shortcut (\"when I say X do Y\" / \"لما أقول X اعمل Y\"), call teach_shortcut.")
             appendLine("- Never invent tool results; report what actually happened. Keep answers concise.")
             appendLine("- To work inside other apps: open_app → read_screen → tap / type_text by element number; each action returns the new screen. Keep going step by step until the task is done, then summarise.")
