@@ -82,6 +82,7 @@ object Permissions {
                 isGranted = { com.myassistant.app.tools.hasUsageAccess(it) },
             ),
         )
+        runtime("mic", "🎙️ الميكروفون", "عشان تكلمه بصوتك بدل الكتابة.", Manifest.permission.RECORD_AUDIO)
         runtime("contacts", "👥 جهات الاتصال", "يلاقي رقم أي حد بالاسم.", Manifest.permission.READ_CONTACTS)
         runtime("calls", "📞 المكالمات", "يتصل (بعد موافقتك) ويقرا سجل المكالمات.", Manifest.permission.CALL_PHONE, Manifest.permission.READ_CALL_LOG)
         runtime("sms", "💬 الرسايل SMS", "يبعت SMS (بعد موافقتك) ويقرا الرسايل.", Manifest.permission.SEND_SMS, Manifest.permission.READ_SMS)

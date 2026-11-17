@@ -2,4 +2,5 @@
 <resources>
     <string name="accessibility_description">بيخلّي "مساعدي" يقرا اللي على الشاشة ويدوس ويكتب في التطبيقات لما تطلب منه. مفيش حاجة بتتبعت لأي حد غير المزوّد اللي إنت مختاره.</string>
     <string name="accessibility_label">مساعدي – التحكم في الشاشة</string>
+    <string name="shortcut_talk">اتكلم</string>
 </resources>

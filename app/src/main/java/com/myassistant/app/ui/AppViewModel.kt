@@ -56,9 +56,70 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var job: Job? = null
 
-    fun send(text: String) {
+    // ---- Voice ----
+
+    val listener = com.myassistant.app.voice.Listener(app)
+    val speaker = com.myassistant.app.voice.Speaker(app)
+    /** True while a spoken back-and-forth is going on. */
+    var voiceMode by mutableStateOf(false)
+        private set
+    /** Set by the activity when the app was opened from the mic shortcut/tile/assist button. */
+    var listenRequest by mutableStateOf(0)
+    var foreground = true
+
+    fun startListening() {
+        if (busy) return
+        speaker.stop()
+        listener.clearError()
+        voiceMode = true
+        screen = Screen.Chat
+        listener.start { text ->
+            if (text == null) {
+                voiceMode = false
+            } else if (isGoodbye(text)) {
+                voiceMode = false
+                speaker.speak("تمام، أنا هنا لو احتجتني.")
+            } else {
+                send(text, spoken = true)
+            }
+        }
+    }
+
+    fun stopVoice() {
+        voiceMode = false
+        listener.stop()
+        speaker.stop()
+    }
+
+    private fun isGoodbye(t: String): Boolean {
+        val w = t.trim().trimEnd('.', '!', '؟').lowercase()
+        return w in setOf("خلاص", "شكرا", "شكراً", "شكرا ليك", "متشكر", "باي", "سلام", "مع السلامة", "اسكت", "بس", "stop", "bye")
+    }
+
+    /** After a spoken request: read the answer aloud, then (hands-free) listen again. */
+    private fun afterVoiceTurn(startIndex: Int) {
+        val reply = messages.drop(startIndex).lastOrNull { it.role == Role.ASSISTANT && it.text.isNotBlank() }?.text
+            ?: error?.let { "حصلت مشكلة: $it" }
+        val again: () -> Unit = {
+            if (voiceMode && settings.handsFree.value && foreground) {
+                startListening()
+            } else {
+                voiceMode = false
+            }
+        }
+        if (reply != null && settings.speakReplies.value) speaker.speak(reply) { again() } else again()
+    }
+
+    override fun onCleared() {
+        listener.stop()
+        speaker.shutdown()
+    }
+
+    fun send(text: String, spoken: Boolean = false) {
         val t = text.trim()
         if (t.isEmpty() || busy) return
+        if (!spoken) stopVoice()
+        val startIndex = messages.size
         error = null
         notice = null
         val userMsg = ChatMessage(role = Role.USER, text = t)
@@ -83,11 +144,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 busy = false
                 confirmRequest = null
                 graph.indexSoon()
+                if (spoken && voiceMode) afterVoiceTurn(startIndex)
             }
         }
     }
 
     fun stop() {
+        stopVoice()
         job?.cancel()
     }
 

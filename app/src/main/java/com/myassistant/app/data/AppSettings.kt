@@ -24,6 +24,16 @@ class AppSettings(context: Context) {
         _askBeforeScreen.value = on
     }
 
+    private val _speakReplies = MutableStateFlow(prefs.getBoolean(SPEAK, true))
+    /** Read replies aloud when the request was spoken. */
+    val speakReplies: StateFlow<Boolean> = _speakReplies.asStateFlow()
+    fun setSpeakReplies(on: Boolean) { prefs.edit().putBoolean(SPEAK, on).apply(); _speakReplies.value = on }
+
+    private val _handsFree = MutableStateFlow(prefs.getBoolean(HANDS_FREE, true))
+    /** After speaking a reply, listen again automatically (a real back-and-forth conversation). */
+    val handsFree: StateFlow<Boolean> = _handsFree.asStateFlow()
+    fun setHandsFree(on: Boolean) { prefs.edit().putBoolean(HANDS_FREE, on).apply(); _handsFree.value = on }
+
     fun setLearnFromAi(on: Boolean) {
         prefs.edit().putBoolean(LEARN, on).apply()
         _learnFromAi.value = on
@@ -38,5 +48,7 @@ class AppSettings(context: Context) {
         const val LEARN = "learn_from_ai"
         const val AUTO_MEMORY = "auto_memory"
         const val ASK_SCREEN = "ask_before_screen"
+        const val SPEAK = "speak_replies"
+        const val HANDS_FREE = "hands_free"
     }
 }

@@ -76,6 +76,9 @@ fun SettingsScreen(vm: AppViewModel) {
     val learn by vm.settings.learnFromAi.collectAsState()
     val autoMemory by vm.settings.autoMemory.collectAsState()
     val meaning by vm.meaningState.collectAsState()
+    val speakReplies by vm.settings.speakReplies.collectAsState()
+    val handsFree by vm.settings.handsFree.collectAsState()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var editing by remember { mutableStateOf<ProviderConfig?>(null) }
 
     Scaffold(
@@ -98,6 +101,42 @@ fun SettingsScreen(vm: AppViewModel) {
             item {
                 Button(onClick = { vm.screen = Screen.Permissions }, modifier = Modifier.fillMaxWidth()) {
                     Text("🔐 الصلاحيات (التحكم في الموبايل)")
+                }
+            }
+            item {
+                Text("🎙️ الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        ToggleRow("يرد عليا بصوت", "لما تكلمه بصوتك، يقرالك الرد", speakReplies) { vm.settings.setSpeakReplies(it) }
+                        ToggleRow(
+                            "محادثة متواصلة",
+                            "بعد ما يرد، يسمعك تاني على طول من غير ما تدوس. قول \"خلاص\" أو \"شكراً\" عشان يقف.",
+                            handsFree,
+                        ) { vm.settings.setHandsFree(it) }
+                        Text(
+                            "طرق سريعة تكلمه بيها: دوس مطوّل على أيقونة التطبيق ← \"اتكلم\"، أو ضيف زرار \"كلّم مساعدي\" " +
+                                "في شريط الإعدادات السريعة (اسحب لتحت ← ✏️ تعديل)، أو اختاره مساعد افتراضي من " +
+                                "الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← المساعد.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row {
+                            TextButton(onClick = {
+                                runCatching {
+                                    ctx.startActivity(android.content.Intent("com.android.settings.TTS_SETTINGS").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }
+                            }) { Text("صوت القراءة") }
+                            TextButton(onClick = {
+                                runCatching {
+                                    ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }.onFailure {
+                                    runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                }
+                            }) { Text("المساعد الافتراضي") }
+                        }
+                    }
                 }
             }
             item {

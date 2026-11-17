@@ -32,6 +32,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -80,6 +82,23 @@ fun ChatScreen(vm: AppViewModel) {
     }
 
     var input by rememberSaveable { mutableStateOf("") }
+    val listen by vm.listener.state.collectAsState()
+    val speaking by vm.speaker.speaking.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.startListening() else vm.notice = "محتاج صلاحية الميكروفون عشان أسمعك." }
+    val onMic: () -> Unit = {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            vm.startListening()
+        } else {
+            micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(vm.listenRequest) { if (vm.listenRequest > 0) onMic() }
+    LaunchedEffect(listen.error) { listen.error?.let { vm.notice = it } }
     val visible = vm.messages.filter { it.role != Role.ASSISTANT || it.text.isNotBlank() }.asReversed()
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size, vm.busy, vm.error) { listState.animateScrollToItem(0) }
@@ -123,12 +142,21 @@ fun ChatScreen(vm: AppViewModel) {
                     textAlign = TextAlign.Center,
                 )
             }
+            VoiceBar(
+                listening = listen.listening,
+                partial = listen.partial,
+                level = listen.level,
+                speaking = speaking,
+                voiceMode = vm.voiceMode,
+                onStop = { vm.stopVoice() },
+            )
             InputBar(
                 value = input,
                 onValueChange = { input = it },
                 busy = vm.busy,
                 onSend = { vm.send(input); input = "" },
                 onStop = { vm.stop() },
+                onMic = onMic,
             )
             }
         },
@@ -266,6 +294,7 @@ private fun InputBar(
     busy: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onMic: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
         Row(
@@ -296,16 +325,71 @@ private fun InputBar(
                 FilledIconButton(onClick = onStop, modifier = Modifier.size(52.dp)) {
                     Icon(Icons.Filled.Close, "إيقاف")
                 }
+            } else if (value.isBlank()) {
+                FilledIconButton(onClick = onMic, modifier = Modifier.size(52.dp)) {
+                    Icon(Icons.Filled.Mic, "اتكلم")
+                }
             } else {
                 FilledIconButton(
                     onClick = onSend,
-                    enabled = value.isNotBlank(),
                     modifier = Modifier.size(52.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, "إرسال")
                 }
             }
         }
+    }
+}
+
+/** Shows what the assistant is hearing, or that it is talking, with a button to stop. */
+@Composable
+private fun VoiceBar(
+    listening: Boolean,
+    partial: String,
+    level: Float,
+    speaking: Boolean,
+    voiceMode: Boolean,
+    onStop: () -> Unit,
+) {
+    if (!listening && !speaking) return
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val pulse by rememberInfiniteTransition(label = "mic").animateFloat(
+            initialValue = 0.85f, targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "pulse",
+        )
+        val scale = if (listening) (0.9f + level * 0.5f).coerceAtMost(1.4f) else pulse
+        Box(
+            Modifier
+                .size(36.dp * scale)
+                .clip(CircleShape)
+                .background(if (listening) UserBubble else MaterialTheme.colorScheme.tertiary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (listening) Icons.Filled.Mic else Icons.AutoMirrored.Filled.VolumeUp, null,
+                tint = Color.White, modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.size(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (listening) "بسمعك…" else "بيتكلم…" + if (voiceMode) " (وبعدها هسمعك تاني)" else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            if (listening && partial.isNotEmpty()) {
+                Text(partial, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 3)
+            }
+        }
+        IconButton(onClick = onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = MaterialTheme.colorScheme.onPrimaryContainer) }
     }
 }
 
@@ -339,7 +423,7 @@ private fun EmptyState(
         Text("أهلاً! أنا مساعدك", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         Text(
-            "اطلب أي حاجة بكلامك العادي",
+            "اطلب أي حاجة بكلامك العادي — اكتب أو دوس 🎤 واتكلم",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
