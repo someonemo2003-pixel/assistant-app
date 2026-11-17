@@ -221,11 +221,13 @@ class MailClient(private val address: String, private val appPassword: String) {
             .flatMap { it.split(',', ' ') }
             .map { it.trim().trim('<', '>').lowercase() }
             .filter { it.contains('@') && it != me }
-        val recipients = runCatching {
-            (m.getRecipients(Message.RecipientType.TO).orEmpty() + m.getRecipients(Message.RecipientType.CC).orEmpty())
-                .mapNotNull { (it as? InternetAddress)?.address?.lowercase() }
-                .filter { it != me }
-        }.getOrDefault(emptyList())
+        val recipients: List<String> = try {
+            val to: List<Address> = m.getRecipients(Message.RecipientType.TO)?.toList() ?: emptyList()
+            val cc: List<Address> = m.getRecipients(Message.RecipientType.CC)?.toList() ?: emptyList()
+            (to + cc).mapNotNull { a -> (a as? InternetAddress)?.address?.lowercase() }.filter { a -> a != me }
+        } catch (e: Exception) {
+            emptyList()
+        }
         return fromHeaders.firstOrNull() ?: recipients.firstOrNull() ?: me
     }
 
