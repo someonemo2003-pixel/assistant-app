@@ -102,8 +102,10 @@ class Agent(
     )
 
     private suspend fun systemPrompt(userText: String): String {
-        val memories = withContext(Dispatchers.IO) {
-            if (memory.count() <= ALWAYS_INCLUDE) memory.recent(ALWAYS_INCLUDE) else memory.search(userText, 8)
+        val memories = if (withContext(Dispatchers.IO) { memory.count() } <= ALWAYS_INCLUDE) {
+            withContext(Dispatchers.IO) { memory.recent(ALWAYS_INCLUDE) }
+        } else {
+            toolContext.recall.memories(userText, 8)
         }
         val now = SimpleDateFormat("EEEE yyyy-MM-dd HH:mm", Locale.US).format(Date())
         return buildString {

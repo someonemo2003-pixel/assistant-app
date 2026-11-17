@@ -33,7 +33,7 @@ class SearchMemoryTool : Tool {
     )
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        val found = withContext(Dispatchers.IO) { ctx.memory.search(args.str("query"), 8) }
+        val found = ctx.recall.memories(args.str("query"), 8)
         return if (found.isEmpty()) "No matching memories" else found.joinToString("\n") { "- ${it.text}" }
     }
 }

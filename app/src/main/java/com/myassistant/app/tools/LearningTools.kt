@@ -47,9 +47,7 @@ class SearchChatsTool : Tool {
     )
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        val hits = withContext(Dispatchers.IO) {
-            ctx.chats.search(args.str("query"), 8, excludeConv = ctx.currentConversation)
-        }
+        val hits = ctx.recall.chats(args.str("query"), 8, excludeConv = ctx.currentConversation)
         if (hits.isEmpty()) return "No matching messages in past chats"
         val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         return hits.joinToString("\n") { h ->

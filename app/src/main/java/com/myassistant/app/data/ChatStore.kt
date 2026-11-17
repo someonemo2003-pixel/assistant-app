@@ -19,7 +19,7 @@ data class ChatHit(val conversationTitle: String, val role: Role, val text: Stri
  * All conversations, saved only on the phone. Also full-text searchable so the assistant can
  * look things up in past chats. Blocking calls — use from Dispatchers.IO.
  */
-class ChatStore(context: Context) : SQLiteOpenHelper(context, "chats.db", null, 1) {
+class ChatStore(context: Context) : SQLiteOpenHelper(context, "chats.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -35,9 +35,57 @@ class ChatStore(context: Context) : SQLiteOpenHelper(context, "chats.db", null, 
         db.execSQL(
             "CREATE VIRTUAL TABLE chat_fts USING fts4(norm, msg_id, conv_id, notindexed=msg_id, notindexed=conv_id, tokenize=unicode61)",
         )
+        db.execSQL(VEC_TABLE)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL(VEC_TABLE)
+    }
+
+    // ---- meaning fingerprints (filled in by the on-device model) ----
+
+    /** Recent user/assistant messages that don't have a fingerprint yet: (id, conv, text). */
+    fun missingVectors(limit: Int = 300): List<Triple<String, Long, String>> =
+        readableDatabase.rawQuery(
+            "SELECT id, conv_id, text FROM messages WHERE role != 'TOOL' AND length(text) > 0 " +
+                "AND id NOT IN (SELECT msg_id FROM chat_vec) ORDER BY created_at DESC LIMIT ?",
+            arrayOf(limit.toString()),
+        ).use { c -> buildList { while (c.moveToNext()) add(Triple(c.getString(0), c.getLong(1), c.getString(2))) } }
+
+    fun setVector(msgId: String, convId: Long, vec: ByteArray) {
+        writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO chat_vec (msg_id, conv_id, vec) VALUES (?, ?, ?)",
+            arrayOf<Any>(msgId, convId, vec),
+        )
+    }
+
+    /** Best matches by meaning, scanning the most recent [scan] fingerprints. */
+    fun searchByVector(score: (ByteArray) -> Float, limit: Int, excludeConv: Long?, scan: Int = 5000): List<Pair<Float, ChatHit>> {
+        val best = readableDatabase.rawQuery(
+            "SELECT v.msg_id, v.conv_id, v.vec FROM chat_vec v ORDER BY v.rowid DESC LIMIT ?",
+            arrayOf(scan.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    if (excludeConv != null && c.getLong(1) == excludeConv) continue
+                    add(score(c.getBlob(2)) to c.getString(0))
+                }
+            }
+        }.sortedByDescending { it.first }.take(limit)
+        return best.mapNotNull { (s, id) ->
+            readableDatabase.rawQuery(
+                "SELECT m.role, m.text, m.created_at, c.title FROM messages m JOIN conversations c ON c.id = m.conv_id WHERE m.id = ?",
+                arrayOf(id),
+            ).use { c ->
+                if (!c.moveToFirst()) null else s to ChatHit(
+                    conversationTitle = c.getString(3),
+                    role = runCatching { Role.valueOf(c.getString(0)) }.getOrDefault(Role.ASSISTANT),
+                    text = c.getString(1),
+                    createdAt = c.getLong(2),
+                )
+            }
+        }
+    }
 
     fun newConversation(title: String): Long {
         val now = System.currentTimeMillis()
@@ -121,6 +169,7 @@ class ChatStore(context: Context) : SQLiteOpenHelper(context, "chats.db", null, 
         try {
             db.execSQL("DELETE FROM messages WHERE conv_id = ?", arrayOf<Any>(convId))
             db.execSQL("DELETE FROM chat_fts WHERE conv_id = ?", arrayOf<Any>(convId))
+            db.execSQL("DELETE FROM chat_vec WHERE conv_id = ?", arrayOf<Any>(convId))
             db.execSQL("DELETE FROM conversations WHERE id = ?", arrayOf<Any>(convId))
             db.setTransactionSuccessful()
         } finally {
@@ -155,6 +204,10 @@ class ChatStore(context: Context) : SQLiteOpenHelper(context, "chats.db", null, 
             }
         }
         return rows.sortedByDescending { it.first }.take(limit).map { it.second }
+    }
+
+    private companion object {
+        const val VEC_TABLE = "CREATE TABLE IF NOT EXISTS chat_vec (msg_id TEXT PRIMARY KEY, conv_id INTEGER NOT NULL, vec BLOB NOT NULL)"
     }
 
     private fun encodeCalls(calls: List<ToolCall>): String {

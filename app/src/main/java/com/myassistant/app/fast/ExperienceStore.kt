@@ -23,17 +23,35 @@ data class Experience(
  * teaches shortcuts. Today it matches by normalised phrase; the meaning-based model (phase B)
  * plugs in on top of [all]. Blocking calls — use from Dispatchers.IO.
  */
-class ExperienceStore(context: Context) : SQLiteOpenHelper(context, "experience.db", null, 1) {
+class ExperienceStore(context: Context) : SQLiteOpenHelper(context, "experience.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE experience (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL, " +
                 "key TEXT NOT NULL UNIQUE, tool TEXT NOT NULL, args TEXT NOT NULL, reply TEXT NOT NULL, " +
-                "source TEXT NOT NULL, uses INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)",
+                "source TEXT NOT NULL, uses INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, vec BLOB)",
         )
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL("ALTER TABLE experience ADD COLUMN vec BLOB")
+    }
+
+    // ---- meaning fingerprints (filled in by the on-device model) ----
+
+    fun missingVectors(limit: Int = 500): List<Experience> =
+        readableDatabase.rawQuery("$SELECT WHERE vec IS NULL LIMIT ?", arrayOf(limit.toString())).use { c ->
+            buildList { while (c.moveToNext()) add(read(c)) }
+        }
+
+    fun setVector(id: Long, vec: ByteArray) {
+        writableDatabase.execSQL("UPDATE experience SET vec = ? WHERE id = ?", arrayOf<Any>(vec, id))
+    }
+
+    fun withVectors(): List<Pair<Experience, ByteArray>> =
+        readableDatabase.rawQuery("SELECT id, phrase, tool, args, reply, source, uses, created_at, vec FROM experience WHERE vec IS NOT NULL", null).use { c ->
+            buildList { while (c.moveToNext()) add(read(c) to c.getBlob(8)) }
+        }
 
     /** Saves (or replaces) what to do for this phrase. Returns false if the phrase is empty. */
     fun learn(phrase: String, tool: String, args: String, reply: String, source: String): Boolean {
@@ -42,6 +60,7 @@ class ExperienceStore(context: Context) : SQLiteOpenHelper(context, "experience.
         // A user-taught shortcut is never overwritten by something learned automatically.
         if (source == "ai" && find(phrase)?.source == "user") return false
         writableDatabase.insertWithOnConflict("experience", null, ContentValues().apply {
+            putNull("vec")
             put("phrase", phrase.trim())
             put("key", key)
             put("tool", tool)

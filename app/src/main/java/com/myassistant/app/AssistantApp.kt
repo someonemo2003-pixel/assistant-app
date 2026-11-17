@@ -12,6 +12,8 @@ import com.myassistant.app.fast.ExperienceStore
 import com.myassistant.app.memory.MemoryStore
 import com.myassistant.app.memory.SqliteMemoryStore
 import com.myassistant.app.security.SecretStore
+import com.myassistant.app.semantic.MeaningModel
+import com.myassistant.app.semantic.Recall
 import com.myassistant.app.tools.DraftSmsTool
 import com.myassistant.app.tools.OpenAppTool
 import com.myassistant.app.tools.RememberTool
@@ -25,6 +27,7 @@ import com.myassistant.app.tools.ToolRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AssistantApp : Application() {
     lateinit var graph: AppGraph
@@ -33,6 +36,7 @@ class AssistantApp : Application() {
     override fun onCreate() {
         super.onCreate()
         graph = AppGraph(this)
+        graph.startBackground()
     }
 }
 
@@ -47,6 +51,8 @@ class AppGraph(context: Context) {
     val memory: MemoryStore = SqliteMemoryStore(context)
     val chats = ChatStore(context)
     val experience = ExperienceStore(context)
+    val meaning = MeaningModel(context)
+    val recall = Recall(meaning, memory, chats, experience)
 
     /** Tools that do things on the phone. */
     private val actionTools = listOf(
@@ -65,7 +71,7 @@ class AppGraph(context: Context) {
         ),
     )
 
-    val toolContext = ToolContext(context.applicationContext, memory, chats, experience)
+    val toolContext = ToolContext(context.applicationContext, memory, chats, experience, recall)
     val router = ProviderRouter { providers.activeProviders() }
 
     val agent = Agent(
@@ -77,4 +83,18 @@ class AppGraph(context: Context) {
     )
 
     val memoryExtractor = MemoryExtractor(router, memory)
+
+    /** Loads the meaning model (if downloaded) and indexes anything new. */
+    fun startBackground() {
+        appScope.launch {
+            meaning.warmUp()
+            runCatching { recall.backfill() }
+        }
+    }
+
+    /** Index new chats/memories/learned phrases soon after they're created. */
+    fun indexSoon() {
+        if (!meaning.isReady) return
+        appScope.launch { runCatching { recall.backfill(300) } }
+    }
 }

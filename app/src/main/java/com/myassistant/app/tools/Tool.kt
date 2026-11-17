@@ -7,6 +7,7 @@ import com.myassistant.app.ai.ToolSpec
 import com.myassistant.app.data.ChatStore
 import com.myassistant.app.fast.ExperienceStore
 import com.myassistant.app.memory.MemoryStore
+import com.myassistant.app.semantic.Recall
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -44,6 +45,7 @@ class ToolContext(
     val memory: MemoryStore,
     val chats: ChatStore,
     val experience: ExperienceStore,
+    val recall: Recall,
 ) {
     /** Id of the conversation in progress (so chat search can skip it). */
     @Volatile var currentConversation: Long? = null

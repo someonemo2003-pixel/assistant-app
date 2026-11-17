@@ -33,6 +33,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val providerStore = graph.providers
     val tools = graph.tools
     val settings = graph.settings
+    val meaningState = graph.meaning.state
 
     val messages = mutableStateListOf<ChatMessage>()
     var busy by mutableStateOf(false)
@@ -81,6 +82,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 busy = false
                 confirmRequest = null
+                graph.indexSoon()
             }
         }
     }
@@ -129,6 +131,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { graph.chats.markExtracted(convId) }
             if (saved > 0) withContext(Dispatchers.Main) { notice = "🧠 اتحفظ $saved معلومة جديدة في الذاكرة" }
         }
+    }
+
+    // ---- Meaning model ----
+
+    fun downloadMeaningModel() {
+        graph.appScope.launch {
+            graph.meaning.download()
+            runCatching { graph.recall.backfill() }
+        }
+    }
+
+    fun deleteMeaningModel() {
+        graph.appScope.launch { graph.meaning.delete() }
     }
 
     // ---- Chats ----
@@ -208,6 +223,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { graph.memory.add(text) }
             loadMemories()
+            graph.indexSoon()
         }
     }
 

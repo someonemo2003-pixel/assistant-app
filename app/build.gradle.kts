@@ -16,6 +16,8 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
+        // Honor 400 and almost all modern phones are 64-bit ARM; keeps the APK small.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     // One fixed key so every new APK installs as an update (your memory and settings are kept).
@@ -52,8 +54,9 @@ android {
     }
     testOptions {
         unitTests.all {
+            it.systemProperty("gemmaDir", System.getenv("GEMMA_TEST_DIR") ?: "")
             it.testLogging {
-                events("failed")
+                events("failed", "standard_out")
                 exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             }
         }
@@ -76,6 +79,15 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Desktop ONNX Runtime so CI can check the on-device model code on a normal computer.
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.22.0")
+}
+
+configurations.configureEach {
+    if (name.endsWith("UnitTestRuntimeClasspath")) {
+        exclude(group = "com.microsoft.onnxruntime", module = "onnxruntime-android")
+    }
 }

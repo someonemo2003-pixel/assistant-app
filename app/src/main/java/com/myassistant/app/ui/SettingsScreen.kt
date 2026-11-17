@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import com.myassistant.app.ai.ProviderConfig
 import com.myassistant.app.ai.ProviderType
 import com.myassistant.app.core.newId
+import com.myassistant.app.semantic.MeaningModel
+import com.myassistant.app.semantic.ModelState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +75,7 @@ fun SettingsScreen(vm: AppViewModel) {
     val keysVersion by vm.providerStore.keysVersion.collectAsState()
     val learn by vm.settings.learnFromAi.collectAsState()
     val autoMemory by vm.settings.autoMemory.collectAsState()
+    val meaning by vm.meaningState.collectAsState()
     var editing by remember { mutableStateOf<ProviderConfig?>(null) }
 
     Scaffold(
@@ -110,6 +115,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     }
                 }
             }
+            item { MeaningModelCard(meaning, onDownload = vm::downloadMeaningModel, onDelete = vm::deleteMeaningModel) }
             item {
                 Text("🧠 المزوّدين (العقل الكبير)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -163,6 +169,58 @@ fun SettingsScreen(vm: AppViewModel) {
             onDelete = if (!cfg.builtIn && !isNew) ({ vm.deleteProvider(cfg.id); editing = null }) else null,
             fetchModels = { c, key -> vm.fetchModels(c, key) },
         )
+    }
+}
+
+@Composable
+private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("🧩 موديل فهم المعنى", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "موديل صغير من Google (EmbeddingGemma) بيشتغل على موبايلك من غير نت. بيخلّي العقل السريع يفهم " +
+                    "نفس الطلب لو اتقال بكلام مختلف، ويدوّر في الذاكرة والشاتات بالمعنى.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            when (state) {
+                is ModelState.NotDownloaded -> {
+                    Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                        Text("تحميل (حوالي ${MeaningModel.APPROX_MB} ميجا)")
+                    }
+                    Text("يفضّل على Wi-Fi. التحميل بيكمّل من مكان ما وقف لو النت قطع.", style = MaterialTheme.typography.labelSmall)
+                }
+                is ModelState.Downloading -> {
+                    val frac = if (state.total > 0) state.downloaded.toFloat() / state.total else 0f
+                    if (state.total > 0) {
+                        LinearProgressIndicator(progress = { frac }, modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    Text(
+                        "بيتحمّل… ${state.downloaded / 1_000_000} / ${state.total / 1_000_000} ميجا — سيب التطبيق مفتوح",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                is ModelState.Loading -> {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text("بيجهّز الموديل…", style = MaterialTheme.typography.labelSmall)
+                }
+                is ModelState.Ready -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("شغال ✓", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = onDelete) { Text("مسح الموديل", color = MaterialTheme.colorScheme.error) }
+                    }
+                }
+                is ModelState.Failed -> {
+                    Text(state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = onDownload) { Text("حاول تاني") }
+                }
+            }
+        }
     }
 }
 

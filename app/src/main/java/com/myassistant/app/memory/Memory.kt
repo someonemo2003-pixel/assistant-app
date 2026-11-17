@@ -19,19 +19,45 @@ interface MemoryStore {
     fun recent(limit: Int = 500): List<MemoryItem>
     fun delete(id: Long)
     fun count(): Int
+
+    // Meaning fingerprints (optional; filled in by the on-device model).
+    fun missingVectors(limit: Int = 500): List<MemoryItem> = emptyList()
+    fun setVector(id: Long, vec: ByteArray) = Unit
+    fun withVectors(): List<Pair<MemoryItem, ByteArray>> = emptyList()
 }
 
 class SqliteMemoryStore(context: Context) :
-    SQLiteOpenHelper(context, "memory.db", null, 1), MemoryStore {
+    SQLiteOpenHelper(context, "memory.db", null, 2), MemoryStore {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE VIRTUAL TABLE memories USING fts4(" +
                 "text, norm, created_at, notindexed=text, notindexed=created_at, tokenize=unicode61)",
         )
+        db.execSQL(VEC_TABLE)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL(VEC_TABLE)
+    }
+
+    override fun missingVectors(limit: Int): List<MemoryItem> =
+        readableDatabase.rawQuery(
+            "SELECT docid, text, created_at FROM memories WHERE docid NOT IN (SELECT id FROM memory_vec) LIMIT ?",
+            arrayOf(limit.toString()),
+        ).use { c -> buildList { while (c.moveToNext()) add(MemoryItem(c.getLong(0), c.getString(1), c.getLong(2))) } }
+
+    override fun setVector(id: Long, vec: ByteArray) {
+        writableDatabase.execSQL("INSERT OR REPLACE INTO memory_vec (id, vec) VALUES (?, ?)", arrayOf<Any>(id, vec))
+    }
+
+    override fun withVectors(): List<Pair<MemoryItem, ByteArray>> {
+        val vecs = readableDatabase.rawQuery("SELECT id, vec FROM memory_vec", null).use { c ->
+            buildMap { while (c.moveToNext()) put(c.getLong(0), c.getBlob(1)) }
+        }
+        if (vecs.isEmpty()) return emptyList()
+        return recent(100_000).mapNotNull { m -> vecs[m.id]?.let { m to it } }
+    }
 
     override fun add(text: String): Long {
         val clean = text.trim()
@@ -73,6 +99,11 @@ class SqliteMemoryStore(context: Context) :
 
     override fun delete(id: Long) {
         writableDatabase.execSQL("DELETE FROM memories WHERE docid = ?", arrayOf(id))
+        writableDatabase.execSQL("DELETE FROM memory_vec WHERE id = ?", arrayOf(id))
+    }
+
+    private companion object {
+        const val VEC_TABLE = "CREATE TABLE IF NOT EXISTS memory_vec (id INTEGER PRIMARY KEY, vec BLOB NOT NULL)"
     }
 
     override fun count(): Int =

@@ -23,7 +23,8 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
     suspend fun tryHandle(text: String): List<ChatMessage>? {
         // Shortcuts the user taught come first, then built-in rules, then things learned from the AI.
         fromExperience(text, userOnly = true)?.let { return it }
-        val intent = FastParser.parse(text) ?: return fromExperience(text, userOnly = false)
+        val intent = FastParser.parse(text)
+            ?: return fromExperience(text, userOnly = false) ?: fromMeaning(text)
         return when (intent) {
             is LocalIntent.AskTime -> listOf(reply("الساعة دلوقتي ${clock(nowHour(), nowMinute())}"))
             is LocalIntent.AskDate -> listOf(reply("النهارده ${SimpleDateFormat("EEEE d MMMM yyyy", Locale("ar", "EG")).format(Date())}"))
@@ -58,6 +59,18 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val result = tool.execute(args, ctx)
         val failed = listOf("Error", "Missing", "Invalid", "No ", "Cannot", "App not found").any { result.startsWith(it) }
         if (failed) return null // let the big brain try instead
+        withContext(Dispatchers.IO) { ctx.experience.markUsed(exp.id) }
+        return actionMessages(exp.tool, args, result, exp.reply)
+    }
+
+    /** Same request said differently: matched by the on-device meaning model. */
+    private suspend fun fromMeaning(text: String): List<ChatMessage>? {
+        val exp = ctx.recall.similarExperience(text) ?: return null
+        val tool = tools[exp.tool]?.takeIf { it.learnable } ?: return null
+        val args = runCatching { JSONObject(exp.args) }.getOrNull() ?: return null
+        val result = tool.execute(args, ctx)
+        val failed = listOf("Error", "Missing", "Invalid", "No ", "Cannot", "App not found").any { result.startsWith(it) }
+        if (failed) return null
         withContext(Dispatchers.IO) { ctx.experience.markUsed(exp.id) }
         return actionMessages(exp.tool, args, result, exp.reply)
     }
