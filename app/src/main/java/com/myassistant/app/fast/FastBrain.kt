@@ -6,6 +6,7 @@ import com.myassistant.app.core.ToolCall
 import com.myassistant.app.core.newId
 import com.myassistant.app.tools.ToolContext
 import com.myassistant.app.tools.ToolRegistry
+import com.myassistant.app.tools.has
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -47,6 +48,40 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 failure = "معرفتش أحفظها.",
             )
             is LocalIntent.OpenApp -> openApp(intent.names)
+            is LocalIntent.Steps -> {
+                val tool = tools["steps"] ?: return null
+                if (!ctx.has(tool.permissions)) return null
+                val args = JSONObject().put("period", intent.period)
+                val r = tool.execute(args, ctx)
+                val m = Regex("(\\d+) steps \\(≈ ([\\d.]+) km").findAll(r).lastOrNull() ?: return null
+                val label = when (intent.period) { "yesterday" -> "امبارح"; "week" -> "الأسبوع ده"; else -> "النهارده" }
+                val total = if (intent.period == "week") Regex("Total: (\\d+)").find(r)?.groupValues?.get(1) ?: m.groupValues[1] else m.groupValues[1]
+                actionMessages("steps", args, r, "مشيت $label $total خطوة 👣" + if (intent.period != "week") " (حوالي ${m.groupValues[2]} كم)" else "")
+            }
+            is LocalIntent.Walk -> {
+                val tool = tools["walk_tracking"] ?: return null
+                if (!ctx.has(tool.permissions)) return null
+                val args = JSONObject().put("action", if (intent.start) "start" else "stop")
+                val r = tool.execute(args, ctx)
+                val text = when {
+                    r.startsWith("Walk tracking started") -> "بدأت أتتبّع مشيك 🚶 — قولّي \"وقّف المشي\" لما تخلص"
+                    r.startsWith("Walk saved") -> Regex("([\\d.]+) km, (\\d+) steps, (\\d+) min").find(r)?.let {
+                        "خلصت ✓ مشيت ${it.groupValues[1]} كم، ${it.groupValues[2]} خطوة في ${it.groupValues[3]} دقيقة 🗺️"
+                    } ?: "وقّفت التتبّع ✓"
+                    r.startsWith("Already") -> "أنا بتتبّعك فعلاً 🚶"
+                    else -> "مفيش تتبّع شغال دلوقتي"
+                }
+                actionMessages("walk_tracking", args, r, text)
+            }
+            is LocalIntent.ShowMap -> {
+                val tool = tools["show_route"] ?: return null
+                val args = JSONObject().put("day", intent.day)
+                val r = tool.execute(args, ctx)
+                actionMessages(
+                    "show_route", args, r,
+                    if (r.startsWith("Showing")) "فتحتلك الخريطة 🗺️" else "مفيش أماكن متسجّلة للوقت ده. فعّل \"الموقع طول الوقت\" من الصلاحيات.",
+                )
+            }
             is LocalIntent.Flashlight -> run(
                 "flashlight", JSONObject().put("on", intent.on.toString()),
                 ok = { it.startsWith("Flashlight o") },

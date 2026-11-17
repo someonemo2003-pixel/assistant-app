@@ -23,7 +23,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, Map }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -55,6 +55,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var notice by mutableStateOf<String?>(null)
 
     private var job: Job? = null
+
+    /** Map to show (set when the assistant calls show_route / stops a walk). */
+    var mapRequest by mutableStateOf<com.myassistant.app.health.MapRequest?>(null)
+
+    init {
+        viewModelScope.launch {
+            com.myassistant.app.health.MapRequests.request.collect { r ->
+                if (r != null) {
+                    mapRequest = r
+                    screen = Screen.Map
+                    com.myassistant.app.health.MapRequests.consume()
+                }
+            }
+        }
+    }
+
+    val walking = com.myassistant.app.health.WalkService.running
+    fun toggleWalk() {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            if (com.myassistant.app.health.WalkService.running.value) com.myassistant.app.health.WalkService.stop(ctx)
+            else com.myassistant.app.health.WalkService.start(ctx)
+        }
+    }
+    var lightTracking by mutableStateOf(com.myassistant.app.health.Health.lightTrackingOn(app))
+        private set
+    fun setLightTracking(on: Boolean) {
+        lightTracking = on
+        com.myassistant.app.health.Health.setLightTracking(getApplication(), on)
+    }
+    fun clearPlaces() {
+        viewModelScope.launch(Dispatchers.IO) { com.myassistant.app.health.ActivityStore.get(getApplication()).clearPlaces() }
+        notice = "اتمسح سجل الأماكن"
+    }
+    fun openMap() { mapRequest = null; screen = Screen.Map }
 
     // ---- Voice ----
 

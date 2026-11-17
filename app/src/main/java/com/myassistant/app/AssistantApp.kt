@@ -101,6 +101,8 @@ class AppGraph(context: Context) {
         // device
         com.myassistant.app.mail.CheckEmailTool(), com.myassistant.app.mail.SearchEmailTool(), com.myassistant.app.mail.ReadEmailTool(),
         com.myassistant.app.mail.MarkEmailReadTool(), com.myassistant.app.mail.DraftEmailTool(), com.myassistant.app.mail.SendEmailTool(),
+        com.myassistant.app.health.StepsTool(), com.myassistant.app.health.WalkTool(),
+        com.myassistant.app.health.ShowRouteTool(), com.myassistant.app.health.PlacesTool(),
         ScreenTimeTool(), DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
     )
 
@@ -132,6 +134,8 @@ class AppGraph(context: Context) {
 
     fun startBackground() {
         runCatching { com.myassistant.app.mail.DailyReport.schedule(appContext) }
+        runCatching { com.myassistant.app.health.Health.schedule(appContext) }
+        appScope.launch { runCatching { com.myassistant.app.health.Health.sampleSteps(appContext) } }
         appScope.launch {
             meaning.warmUp()
             runCatching { recall.backfill() }

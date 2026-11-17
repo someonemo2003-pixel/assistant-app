@@ -11,6 +11,9 @@ sealed interface LocalIntent {
     data class OpenApp(val names: List<String>) : LocalIntent
     data class Remember(val fact: String) : LocalIntent
     data class Flashlight(val on: Boolean) : LocalIntent
+    data class Steps(val period: String) : LocalIntent
+    data class Walk(val start: Boolean) : LocalIntent
+    data class ShowMap(val day: String) : LocalIntent
     data object AskTime : LocalIntent
     data object AskDate : LocalIntent
 }
@@ -33,6 +36,21 @@ object FastParser {
             val off = words.any { it in setOf("اقفل", "اقفلي", "طفي", "اطفي", "وقف", "off") }
             val on = words.any { it in setOf("شغل", "شغلي", "افتح", "ولع", "نور", "on") }
             if (off != on) return LocalIntent.Flashlight(on)
+        }
+
+        // Health & places
+        val day = if ("امبارح" in words || "امس" in words) "yesterday" else "today"
+        if (words.any { it.startsWith("خطو") } && words.any { it in setOf("كام", "كم", "عدد", "قد") }) {
+            return LocalIntent.Steps(if ("الاسبوع" in words || "اسبوع" in words) "week" else day)
+        }
+        val aboutWalk = words.any { it == "المشي" || it == "مشي" || it == "تتبع" || it == "المشوار" }
+        if (aboutWalk && words.any { it in setOf("ابدا", "ابدء", "شغل", "start") }) return LocalIntent.Walk(true)
+        if (aboutWalk && words.any { it in setOf("وقف", "اقفل", "خلص", "stop", "انهي") }) return LocalIntent.Walk(false)
+        val startsWithOpen = words.firstOrNull()?.let { it in openWords } == true
+        if ("مشيت فين" in t || "رحت فين" in t || "روحت فين" in t ||
+            (!startsWithOpen && words.any { it == "خريطه" || it == "الخريطه" || it == "خريطتي" })
+        ) {
+            return LocalIntent.ShowMap(day)
         }
 
         val wantsAlarm = alarmWords.any { w -> words.any { it.startsWith(w) } } || "alarm" in words

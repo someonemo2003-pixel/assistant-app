@@ -108,6 +108,25 @@ fun SettingsScreen(vm: AppViewModel) {
             }
             item { MailCard(vm) }
             item {
+                val walking by vm.walking.collectAsState()
+                Text("🚶 الصحة والأماكن", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.size(8.dp))
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        ToggleRow(
+                            "تسجيل الأماكن طول اليوم",
+                            "نقطة كل حوالي ربع ساعة (خفيف على البطارية) — محفوظ على موبايلك بس",
+                            vm.lightTracking,
+                        ) { vm.setLightTracking(it) }
+                        Row {
+                            TextButton(onClick = { vm.openMap() }) { Text("🗺️ خريطتي") }
+                            TextButton(onClick = { vm.toggleWalk() }) { Text(if (walking) "⏹ وقّف المشي" else "▶️ ابدأ تتبّع المشي") }
+                            TextButton(onClick = { vm.clearPlaces() }) { Text("مسح السجل", color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+            }
+            item {
                 Text("🎙️ الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             item {

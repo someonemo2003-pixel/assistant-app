@@ -88,6 +88,14 @@ object Permissions {
         runtime("sms", "💬 الرسايل SMS", "يبعت SMS (بعد موافقتك) ويقرا الرسايل.", Manifest.permission.SEND_SMS, Manifest.permission.READ_SMS)
         runtime("calendar", "📅 الكالندر", "يقرا مواعيدك ويضيف مواعيد جديدة.", Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
         runtime("location", "📍 الموقع", "يعرف إنت فين.", Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (Build.VERSION.SDK_INT >= 29) {
+            runtime("steps", "👣 عدّاد الخطوات", "يعدّ خطواتك بنفسه من غير أي تطبيق تاني.", Manifest.permission.ACTIVITY_RECOGNITION)
+            runtime(
+                "bg_location", "🗺️ الموقع طول الوقت",
+                "عشان يسجّل الأماكن اللي رحتها ويرسملك خريطة. فعّل \"الموقع\" الأول، وبعدين اختار \"السماح طول الوقت\".",
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            )
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             runtime("post_notif", "📣 إظهار إشعارات", "يبعتلك تنبيهات وتقارير.", Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -116,5 +124,7 @@ object Permissions {
 
     fun appDetails(ctx: Context) = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkgUri(ctx))
 
-    fun allRuntime(): Array<String> = all.flatMap { it.runtime }.distinct().toTypedArray()
+    /** Background location must be requested on its own, after normal location — so it's not in the bulk request. */
+    fun allRuntime(): Array<String> = all.flatMap { it.runtime }
+        .filter { it != Manifest.permission.ACCESS_BACKGROUND_LOCATION }.distinct().toTypedArray()
 }

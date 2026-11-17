@@ -52,6 +52,15 @@ class FastParserTest {
         assertEquals(LocalIntent.Flashlight(true), p("ولّع الفلاش"))
     }
 
+    @Test fun health() {
+        assertEquals(LocalIntent.Steps("today"), p("مشيت كام خطوة النهارده؟"))
+        assertEquals(LocalIntent.Steps("yesterday"), p("مشيت كام خطوة امبارح"))
+        assertEquals(LocalIntent.Walk(true), p("ابدأ تتبع المشي"))
+        assertEquals(LocalIntent.Walk(false), p("وقف المشي"))
+        assertEquals(LocalIntent.ShowMap("today"), p("وريني أنا مشيت فين النهارده"))
+        assertEquals(LocalIntent.ShowMap("yesterday"), p("ارسملي الخريطة بتاعة امبارح"))
+    }
+
     @Test fun questions() {
         assertEquals(AskTime, p("الساعة كام؟"))
         assertEquals(AskTime, p("الساعه كم"))
