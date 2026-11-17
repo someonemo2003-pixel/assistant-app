@@ -169,7 +169,10 @@ class GemmaTokenizer private constructor(
             when (wire) {
                 0 -> varint()
                 1 -> pos += 8
-                2 -> pos += varint().toInt()
+                2 -> {
+                    val n = varint().toInt() // read the length first, then jump over the bytes
+                    pos += n
+                }
                 5 -> pos += 4
                 else -> pos = end
             }
