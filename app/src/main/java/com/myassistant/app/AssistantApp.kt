@@ -14,7 +14,32 @@ import com.myassistant.app.memory.SqliteMemoryStore
 import com.myassistant.app.security.SecretStore
 import com.myassistant.app.semantic.MeaningModel
 import com.myassistant.app.semantic.Recall
+import com.myassistant.app.control.PhoneButtonTool
+import com.myassistant.app.control.ReadNotificationsTool
+import com.myassistant.app.control.ReadScreenTool
+import com.myassistant.app.control.ScrollTool
+import com.myassistant.app.control.TapTool
+import com.myassistant.app.control.TypeTextTool
+import com.myassistant.app.tools.AddEventTool
+import com.myassistant.app.tools.BrightnessTool
+import com.myassistant.app.tools.CallTool
+import com.myassistant.app.tools.DeviceStatusTool
 import com.myassistant.app.tools.DraftSmsTool
+import com.myassistant.app.tools.FindContactTool
+import com.myassistant.app.tools.FlashlightTool
+import com.myassistant.app.tools.ListAppsTool
+import com.myassistant.app.tools.ListEventsTool
+import com.myassistant.app.tools.ListFilesTool
+import com.myassistant.app.tools.LocationTool
+import com.myassistant.app.tools.OpenFileTool
+import com.myassistant.app.tools.OpenSettingsTool
+import com.myassistant.app.tools.OpenUrlTool
+import com.myassistant.app.tools.ReadFileTool
+import com.myassistant.app.tools.ReadSmsTool
+import com.myassistant.app.tools.RecentCallsTool
+import com.myassistant.app.tools.SearchFilesTool
+import com.myassistant.app.tools.SendSmsTool
+import com.myassistant.app.tools.SetVolumeTool
 import com.myassistant.app.tools.OpenAppTool
 import com.myassistant.app.tools.RememberTool
 import com.myassistant.app.tools.SearchChatsTool
@@ -54,12 +79,17 @@ class AppGraph(context: Context) {
     val meaning = MeaningModel(context)
     val recall = Recall(meaning, memory, chats, experience)
 
-    /** Tools that do things on the phone. */
+    /** Tools that do things on the phone. Add a new capability here. */
     private val actionTools = listOf(
-        SetAlarmTool(),
-        SetTimerTool(),
-        OpenAppTool(),
-        DraftSmsTool(),
+        SetAlarmTool(), SetTimerTool(), OpenAppTool(), DraftSmsTool(),
+        // screen control
+        ReadScreenTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(),
+        // phone data
+        ReadNotificationsTool(), FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
+        ListEventsTool(), AddEventTool(), LocationTool(),
+        ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
+        // device
+        DeviceStatusTool(), SetVolumeTool(), FlashlightTool(), BrightnessTool(), OpenSettingsTool(), ListAppsTool(), OpenUrlTool(),
     )
 
     val tools = ToolRegistry(
@@ -71,7 +101,7 @@ class AppGraph(context: Context) {
         ),
     )
 
-    val toolContext = ToolContext(context.applicationContext, memory, chats, experience, recall)
+    val toolContext = ToolContext(context.applicationContext, memory, chats, experience, recall, settings)
     val router = ProviderRouter { providers.activeProviders() }
 
     val agent = Agent(

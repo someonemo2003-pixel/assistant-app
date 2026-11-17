@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import com.myassistant.app.ai.ToolSpec
+import com.myassistant.app.data.AppSettings
 import com.myassistant.app.data.ChatStore
 import com.myassistant.app.fast.ExperienceStore
 import com.myassistant.app.memory.MemoryStore
@@ -32,6 +33,14 @@ interface Tool {
     val requiresConfirmation: Boolean get() = false
     /** If true, the fast brain may learn phrases that trigger this tool and replay them offline. */
     val learnable: Boolean get() = false
+    /** Tools in the same group share one approval per request (e.g. "screen"). Empty = ask each time. */
+    val group: String get() = ""
+
+    /** Whether this particular call needs the user's OK (defaults to [requiresConfirmation]). */
+    fun needsConfirmation(args: JSONObject, ctx: ToolContext): Boolean = requiresConfirmation
+
+    /** Android permissions this tool needs (checked before running). */
+    val permissions: List<String> get() = emptyList()
 
     /** Human sentence shown in the approval dialog. */
     fun describe(args: JSONObject): String = title
@@ -46,6 +55,7 @@ class ToolContext(
     val chats: ChatStore,
     val experience: ExperienceStore,
     val recall: Recall,
+    val settings: AppSettings,
 ) {
     /** Id of the conversation in progress (so chat search can skip it). */
     @Volatile var currentConversation: Long? = null
@@ -61,6 +71,11 @@ class ToolContext(
             false
         }
     }
+}
+
+/** True if all of [perms] are granted. */
+fun ToolContext.has(perms: List<String>) = perms.all {
+    androidx.core.content.ContextCompat.checkSelfPermission(app, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
 }
 
 class ToolRegistry(val all: List<Tool>) {

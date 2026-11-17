@@ -46,6 +46,12 @@ class FastParserTest {
         assertNull(p("شغل اغنية عمرو دياب"))
     }
 
+    @Test fun flashlight() {
+        assertEquals(LocalIntent.Flashlight(true), p("شغل الكشاف"))
+        assertEquals(LocalIntent.Flashlight(false), p("اقفل الكشاف"))
+        assertEquals(LocalIntent.Flashlight(true), p("ولّع الفلاش"))
+    }
+
     @Test fun questions() {
         assertEquals(AskTime, p("الساعة كام؟"))
         assertEquals(AskTime, p("الساعه كم"))

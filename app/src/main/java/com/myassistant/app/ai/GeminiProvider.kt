@@ -64,7 +64,10 @@ class GeminiProvider(
         if (tools.isNotEmpty()) {
             val decls = JSONArray()
             tools.forEach { t ->
-                decls.put(JSONObject().put("name", t.name).put("description", t.description).put("parameters", t.parameters))
+                val d = JSONObject().put("name", t.name).put("description", t.description)
+                // Gemini rejects an object schema with no properties: omit parameters for no-arg tools.
+                if ((t.parameters.optJSONObject("properties")?.length() ?: 0) > 0) d.put("parameters", t.parameters)
+                decls.put(d)
             }
             body.put("tools", JSONArray().put(JSONObject().put("functionDeclarations", decls)))
         }

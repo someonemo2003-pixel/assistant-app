@@ -10,6 +10,7 @@ sealed interface LocalIntent {
     data class Timer(val seconds: Int) : LocalIntent
     data class OpenApp(val names: List<String>) : LocalIntent
     data class Remember(val fact: String) : LocalIntent
+    data class Flashlight(val on: Boolean) : LocalIntent
     data object AskTime : LocalIntent
     data object AskDate : LocalIntent
 }
@@ -26,6 +27,12 @@ object FastParser {
         rememberRegex.find(original)?.let { m ->
             val fact = m.groupValues[2].trim().trimEnd('.', '!', '؟', '?')
             if (fact.length >= 3) return LocalIntent.Remember(fact)
+        }
+
+        if (words.any { it == "كشاف" || it == "الكشاف" || it == "فلاش" || it == "الفلاش" || it == "flashlight" }) {
+            val off = words.any { it in setOf("اقفل", "اقفلي", "طفي", "اطفي", "وقف", "off") }
+            val on = words.any { it in setOf("شغل", "شغلي", "افتح", "ولع", "نور", "on") }
+            if (off != on) return LocalIntent.Flashlight(on)
         }
 
         val wantsAlarm = alarmWords.any { w -> words.any { it.startsWith(w) } } || "alarm" in words

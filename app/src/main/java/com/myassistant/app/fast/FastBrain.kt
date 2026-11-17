@@ -47,6 +47,12 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 failure = "معرفتش أحفظها.",
             )
             is LocalIntent.OpenApp -> openApp(intent.names)
+            is LocalIntent.Flashlight -> run(
+                "flashlight", JSONObject().put("on", intent.on.toString()),
+                ok = { it.startsWith("Flashlight o") },
+                success = if (intent.on) "ولّعت الكشاف 🔦" else "طفيت الكشاف",
+                failure = "معرفتش أتحكم في الكشاف.",
+            )
         }
     }
 

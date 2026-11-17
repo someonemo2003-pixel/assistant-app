@@ -23,7 +23,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -185,6 +185,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun askConfirm(text: String): Boolean = suspendCancellableCoroutine { cont ->
+        // If the assistant is working inside another app, bring ours back so the user sees the question.
+        runCatching {
+            val app = getApplication<Application>()
+            app.startActivity(
+                android.content.Intent(app, com.myassistant.app.MainActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            )
+        }
         confirmRequest = ConfirmRequest(text) { ok ->
             confirmRequest = null
             if (cont.isActive) cont.resume(ok)

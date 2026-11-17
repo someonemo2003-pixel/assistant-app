@@ -96,6 +96,11 @@ fun SettingsScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
+                Button(onClick = { vm.screen = Screen.Permissions }, modifier = Modifier.fillMaxWidth()) {
+                    Text("🔐 الصلاحيات (التحكم في الموبايل)")
+                }
+            }
+            item {
                 Text("⚡ العقل السريع والتعلّم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             item {
