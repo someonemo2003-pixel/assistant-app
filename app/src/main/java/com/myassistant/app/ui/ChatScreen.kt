@@ -65,7 +65,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.myassistant.app.core.Role
+import com.myassistant.app.ui.theme.UserBubble
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,8 +159,8 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null) {
         )
         Surface(
             shape = shape,
-            color = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            color = if (mine) UserBubble else MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = if (mine) Color.White else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.widthIn(max = 320.dp),
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -269,9 +271,9 @@ private fun InputBar(
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 5,
                 colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                    disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ),

@@ -32,7 +32,7 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -o pipefail
-          gradle assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+          gradle testReleaseUnitTest assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
           cp app/build/outputs/apk/release/app-release.apk "assistant-0.1.${{ github.run_number }}.apk"
 
       - name: Publish release

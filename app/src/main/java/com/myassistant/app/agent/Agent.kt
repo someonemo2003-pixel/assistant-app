@@ -3,6 +3,7 @@ package com.myassistant.app.agent
 import com.myassistant.app.ai.ProviderRouter
 import com.myassistant.app.core.ChatMessage
 import com.myassistant.app.core.Role
+import com.myassistant.app.fast.FastBrain
 import com.myassistant.app.memory.MemoryStore
 import com.myassistant.app.tools.ToolContext
 import com.myassistant.app.tools.ToolRegistry
@@ -26,12 +27,24 @@ class Agent(
     private val toolContext: ToolContext,
 ) {
 
+    private val fastBrain = FastBrain(tools, toolContext)
+
     suspend fun run(
         history: MutableList<ChatMessage>,
         emit: suspend (ChatMessage) -> Unit,
         confirm: suspend (String) -> Boolean,
     ) {
         val lastUser = history.lastOrNull { it.role == Role.USER }?.text.orEmpty()
+
+        // 1) Instant local brain for simple commands (no internet, no quota).
+        if (history.lastOrNull()?.role == Role.USER) {
+            fastBrain.tryHandle(lastUser)?.let { msgs ->
+                msgs.forEach { history += it; emit(it) }
+                return
+            }
+        }
+
+        // 2) Cloud AI for everything else.
         val system = systemPrompt(lastUser)
 
         repeat(MAX_STEPS) {

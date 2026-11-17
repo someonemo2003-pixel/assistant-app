@@ -10,6 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+/** Strong indigo with white text: readable in light and dark mode. */
+val UserBubble = Color(0xFF4F46E5)
+
 private val Light = lightColorScheme(
     primary = Color(0xFF4F46E5),
     onPrimary = Color.White,
