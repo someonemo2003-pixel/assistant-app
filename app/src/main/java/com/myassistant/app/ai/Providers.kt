@@ -112,10 +112,10 @@ class ProviderStore(context: Context, private val secrets: SecretStore) {
         save(list)
     }
 
-    /** Enabled providers that have a key, in fallback order. */
-    fun activeProviders(): List<LlmProvider> = _configs.value
+    /** Enabled providers that have a key, in fallback order, with their ids. */
+    fun activeProviders(): List<Pair<String, LlmProvider>> = _configs.value
         .filter { it.enabled }
-        .mapNotNull { c -> apiKey(c.id)?.takeIf { it.isNotBlank() }?.let { ProviderFactory.create(c, it) } }
+        .mapNotNull { c -> apiKey(c.id)?.takeIf { it.isNotBlank() }?.let { c.id to ProviderFactory.create(c, it) } }
 
     private fun keyName(id: String) = "api_key_$id"
 
@@ -143,10 +143,17 @@ class AllProvidersFailedException(val errors: List<String>) :
     Exception("كل المزوّدين فشلوا:\n" + errors.joinToString("\n"))
 
 /** Tries each provider in order; if one fails (limit reached, offline, error) moves to the next. */
-class ProviderRouter(private val providers: () -> List<LlmProvider>) {
+class ProviderRouter(private val providers: () -> List<Pair<String, LlmProvider>>) {
 
-    suspend fun complete(system: String, history: List<ChatMessage>, tools: List<ToolSpec>): ChatMessage {
-        val list = providers()
+    /** [preferred] = provider id to try first (e.g. the one chosen for chatting or for phone actions). */
+    suspend fun complete(
+        system: String,
+        history: List<ChatMessage>,
+        tools: List<ToolSpec>,
+        preferred: String? = null,
+    ): ChatMessage {
+        val all = providers()
+        val list = (all.filter { it.first == preferred } + all.filterNot { it.first == preferred }).map { it.second }
         if (list.isEmpty()) throw NoProvidersException()
         val errors = mutableListOf<String>()
         for (p in list) {

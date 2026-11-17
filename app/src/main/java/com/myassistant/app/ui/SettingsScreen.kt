@@ -78,6 +78,8 @@ fun SettingsScreen(vm: AppViewModel) {
     val meaning by vm.meaningState.collectAsState()
     val speakReplies by vm.settings.speakReplies.collectAsState()
     val handsFree by vm.settings.handsFree.collectAsState()
+    val chatBrain by vm.settings.chatBrain.collectAsState()
+    val actionBrain by vm.settings.actionBrain.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var editing by remember { mutableStateOf<ProviderConfig?>(null) }
 
@@ -160,6 +162,26 @@ fun SettingsScreen(vm: AppViewModel) {
                 }
             }
             item { MeaningModelCard(meaning, onDownload = vm::downloadMeaningModel, onDelete = vm::deleteMeaningModel) }
+            item {
+                Text("🧭 مين يعمل إيه", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        BrainPicker("💬 الدردشة والأسئلة", "محتاج عقل فاهم عربي كويس (Gemini مثلاً)", chatBrain, configs) {
+                            vm.settings.setChatBrain(it)
+                        }
+                        BrainPicker("📱 تنفيذ الأوامر على الموبايل", "محتاج عقل سريع في الخطوات", actionBrain, configs) {
+                            vm.settings.setActionBrain(it)
+                        }
+                        Text(
+                            "لو اللي اخترته وقع أو خلص الحد المجاني، بينقل للباقيين بالترتيب اللي تحت.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             item {
                 Text("🧠 المزوّدين (العقل الكبير)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -262,6 +284,27 @@ private fun MeaningModelCard(state: ModelState, onDownload: () -> Unit, onDelete
                 is ModelState.Failed -> {
                     Text(state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     Button(onClick = onDownload) { Text("حاول تاني") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrainPicker(title: String, hint: String, selected: String, configs: List<ProviderConfig>, onSelect: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val current = configs.firstOrNull { it.id == selected }?.let { "${it.name} · ${it.model}" } ?: "بالترتيب العادي"
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box {
+            TextButton(onClick = { open = true }) { Text(current, maxLines = 1) }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("بالترتيب العادي") }, onClick = { onSelect(""); open = false })
+                configs.filter { it.enabled }.forEach { c ->
+                    DropdownMenuItem(text = { Text("${c.name} · ${c.model}") }, onClick = { onSelect(c.id); open = false })
                 }
             }
         }

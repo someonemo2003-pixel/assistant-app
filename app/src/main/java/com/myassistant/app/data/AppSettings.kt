@@ -34,6 +34,16 @@ class AppSettings(context: Context) {
     val handsFree: StateFlow<Boolean> = _handsFree.asStateFlow()
     fun setHandsFree(on: Boolean) { prefs.edit().putBoolean(HANDS_FREE, on).apply(); _handsFree.value = on }
 
+    private val _chatBrain = MutableStateFlow(prefs.getString(CHAT_BRAIN, "gemini") ?: "")
+    /** Provider id used first for conversation ("" = normal order). */
+    val chatBrain: StateFlow<String> = _chatBrain.asStateFlow()
+    fun setChatBrain(id: String) { prefs.edit().putString(CHAT_BRAIN, id).apply(); _chatBrain.value = id }
+
+    private val _actionBrain = MutableStateFlow(prefs.getString(ACTION_BRAIN, "") ?: "")
+    /** Provider id used first while operating the phone screen ("" = normal order). */
+    val actionBrain: StateFlow<String> = _actionBrain.asStateFlow()
+    fun setActionBrain(id: String) { prefs.edit().putString(ACTION_BRAIN, id).apply(); _actionBrain.value = id }
+
     fun setLearnFromAi(on: Boolean) {
         prefs.edit().putBoolean(LEARN, on).apply()
         _learnFromAi.value = on
@@ -50,5 +60,7 @@ class AppSettings(context: Context) {
         const val ASK_SCREEN = "ask_before_screen"
         const val SPEAK = "speak_replies"
         const val HANDS_FREE = "hands_free"
+        const val CHAT_BRAIN = "chat_brain"
+        const val ACTION_BRAIN = "action_brain"
     }
 }

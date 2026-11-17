@@ -60,6 +60,16 @@ class ToolContext(
     /** Id of the conversation in progress (so chat search can skip it). */
     @Volatile var currentConversation: Long? = null
 
+    /** Screen steps done during the current request, by stable selector (saved as a replayable recipe). */
+    @Volatile var recorder: MutableList<String>? = null
+    @Volatile var recordFailed = false
+    /** Steps of the last completed screen task (for "save these steps"). */
+    @Volatile var lastRecipe: List<String>? = null
+
+    fun record(step: String?) {
+        if (step == null) recordFailed = true else recorder?.add(step)
+    }
+
     /** Starts an activity from anywhere; returns false if nothing on the phone can handle it. */
     suspend fun launch(intent: Intent): Boolean = withContext(Dispatchers.Main) {
         try {

@@ -20,7 +20,10 @@ import com.myassistant.app.control.MissedMessagesTool
 import com.myassistant.app.control.NotificationAlertTool
 import com.myassistant.app.control.ReadNotificationsTool
 import com.myassistant.app.control.ReplyNotificationTool
+import com.myassistant.app.control.DoStepsTool
 import com.myassistant.app.control.ReadScreenTool
+import com.myassistant.app.control.RunRecipeTool
+import com.myassistant.app.control.SaveStepsTool
 import com.myassistant.app.control.ScrollTool
 import com.myassistant.app.control.TapTool
 import com.myassistant.app.control.TypeTextTool
@@ -88,7 +91,7 @@ class AppGraph(context: Context) {
     private val actionTools = listOf(
         SetAlarmTool(), SetTimerTool(), OpenAppTool(), DraftSmsTool(),
         // screen control
-        ReadScreenTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(),
+        ReadScreenTool(), DoStepsTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(), RunRecipeTool(),
         // phone data
         ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), ClearNotificationsTool(), NotificationAlertTool(),
         FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
@@ -103,7 +106,8 @@ class AppGraph(context: Context) {
             RememberTool(),
             SearchMemoryTool(),
             SearchChatsTool(),
-            TeachShortcutTool(actionTools.filter { it.learnable }.associate { it.name to it.description }),
+            TeachShortcutTool(actionTools.filter { it.learnable && it.name != "run_recipe" }.associate { it.name to it.description }),
+            SaveStepsTool(),
         ),
     )
 
