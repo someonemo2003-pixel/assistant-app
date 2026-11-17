@@ -84,8 +84,8 @@ class ReplyNotificationTool : Tool {
     override val name = "reply_message"
     override val title = "رد على رسالة"
     override val description =
-        "Reply to a message from its notification without opening the app (WhatsApp, Telegram, Messenger, SMS...). " +
-            "Works while the notification is still in the shade. 'to' is the sender or group name."
+        "Send a reply to someone: first through the notification (instant, app stays closed); if the notification is gone, " +
+            "it sends by itself through WhatsApp (opens the chat and presses Send). 'to' is the sender/group name or a phone number."
     override val parameters = Schema.obj(
         "to" to Schema.string("Sender or group name as shown in the notification"),
         "message" to Schema.string("Reply text"),
@@ -96,7 +96,8 @@ class ReplyNotificationTool : Tool {
     override fun describe(args: JSONObject) = "رد على ${args.str("to")}: \"${args.str("message").take(80)}\""
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        val reader = NotificationReader.current ?: return OFF
+        val reader = NotificationReader.current
+            ?: return WhatsAppSender.send(ctx, args.str("to"), args.str("message"))
         val to = args.str("to").lowercase()
         val app = args.str("app").lowercase()
         val candidates = reader.live().filter { sbn ->
@@ -110,8 +111,12 @@ class ReplyNotificationTool : Tool {
                 sbn.notification.actions?.any { a -> a.remoteInputs?.isNotEmpty() == true } == true
         }
         val target = candidates.maxByOrNull { it.postTime }
-            ?: return "No open notification from \"${args.str("to")}\" that can be replied to. Use open_app + read_screen + type_text instead."
-        return if (reader.reply(target, args.str("message"))) "Reply sent to ${args.str("to")}" else "Reply failed; try through the app with screen control"
+        if (target != null && reader.reply(target, args.str("message"))) return "Reply sent to ${args.str("to")}"
+        // Notification gone: do it inside the app ourselves instead of asking the user.
+        val isWhatsApp = app.isEmpty() || app.contains("whats") || app.contains("واتس")
+        if (isWhatsApp) return WhatsAppSender.send(ctx, args.str("to"), args.str("message"))
+        return "The notification is gone. Do it yourself now with open_app ${args.str("app")} + read_screen + do_steps " +
+            "(search the chat, type the message, tap send). Do NOT ask the user to do it."
     }
 }
 

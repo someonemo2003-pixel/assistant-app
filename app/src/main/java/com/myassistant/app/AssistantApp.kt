@@ -94,7 +94,7 @@ class AppGraph(context: Context) {
         // screen control
         ReadScreenTool(), DoStepsTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(), RunRecipeTool(),
         // phone data
-        ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), ClearNotificationsTool(), NotificationAlertTool(),
+        ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), com.myassistant.app.control.SendWhatsAppTool(), ClearNotificationsTool(), NotificationAlertTool(),
         FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
         ListEventsTool(), AddEventTool(), LocationTool(),
         ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
