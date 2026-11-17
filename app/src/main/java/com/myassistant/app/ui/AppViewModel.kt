@@ -265,6 +265,39 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.myassistant.app.mail.DailyReport.configure(getApplication(), on, hour, minute)
     }
 
+    var reportSources by mutableStateOf(com.myassistant.app.mail.DailyReport.sources(app))
+        private set
+
+    fun toggleReportSource(k: String) {
+        val s = reportSources.toMutableSet().apply { if (!add(k)) remove(k) }
+        reportSources = s
+        com.myassistant.app.mail.DailyReport.setSources(getApplication(), s)
+    }
+
+    data class ChatAccount(val pkg: String, val app: String, val raw: String, val label: String, val custom: String?, val count: Int)
+
+    val chatAccounts = mutableStateListOf<ChatAccount>()
+
+    fun loadAccounts() {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val list = withContext(Dispatchers.IO) {
+                val all = com.myassistant.app.control.NotificationStore.get(ctx).accounts()
+                all.filter { (pa, _, _) -> pa.first in com.myassistant.app.control.Accounts.WHATSAPP || all.count { it.first.first == pa.first } > 1 }
+                    .map { (pa, acc, n) ->
+                        ChatAccount(pa.first, pa.second, acc, com.myassistant.app.control.Accounts.label(ctx, pa.first, pa.second, acc),
+                            com.myassistant.app.control.Accounts.customName(ctx, pa.first, acc), n)
+                    }
+            }
+            chatAccounts.clear(); chatAccounts.addAll(list)
+        }
+    }
+
+    fun renameAccount(a: ChatAccount, name: String) {
+        com.myassistant.app.control.Accounts.rename(getApplication(), a.pkg, a.raw, name)
+        loadAccounts()
+    }
+
     /** Builds and shows the report right now (to try it). */
     fun reportNow() {
         notice = "⏳ بيجهّز التقرير…"

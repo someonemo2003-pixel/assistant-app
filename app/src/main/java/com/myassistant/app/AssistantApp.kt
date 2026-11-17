@@ -99,7 +99,7 @@ class AppGraph(context: Context) {
         ListEventsTool(), AddEventTool(), LocationTool(),
         ListFilesTool(), SearchFilesTool(), ReadFileTool(), OpenFileTool(),
         // device
-        com.myassistant.app.mail.CheckEmailTool(), com.myassistant.app.mail.SearchEmailTool(), com.myassistant.app.mail.ReadEmailTool(),
+        com.myassistant.app.mail.ReportTool(), com.myassistant.app.mail.CheckEmailTool(), com.myassistant.app.mail.SearchEmailTool(), com.myassistant.app.mail.ReadEmailTool(),
         com.myassistant.app.mail.MarkEmailReadTool(), com.myassistant.app.mail.DraftEmailTool(), com.myassistant.app.mail.SendEmailTool(),
         com.myassistant.app.reminders.AddReminderTool(), com.myassistant.app.reminders.ListRemindersTool(),
         com.myassistant.app.reminders.CancelReminderTool(), com.myassistant.app.reminders.SavePlaceTool(),

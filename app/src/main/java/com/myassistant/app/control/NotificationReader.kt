@@ -50,6 +50,7 @@ class NotificationReader : NotificationListenerService() {
         val fresh = mutableListOf<SavedNotification>()
 
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+        val account = accountOf(sbn, extras, style)
         if (style != null && style.messages.isNotEmpty()) {
             val conv = style.conversationTitle?.toString()
                 ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
@@ -57,7 +58,7 @@ class NotificationReader : NotificationListenerService() {
                 val text = m.text?.toString()?.trim().orEmpty()
                 if (text.isEmpty()) continue
                 val sender = m.person?.name?.toString() ?: conv
-                val item = SavedNotification(0, sbn.key, sbn.packageName, app, conv, sender, text.take(1500), m.timestamp, isEmail, true)
+                val item = SavedNotification(0, sbn.key, sbn.packageName, app, conv, sender, text.take(1500), m.timestamp, isEmail, true, account)
                 if (store.save(item)) fresh += item
             }
         } else {
@@ -70,7 +71,7 @@ class NotificationReader : NotificationListenerService() {
             val isMessage = n.category == Notification.CATEGORY_MESSAGE || sbn.packageName in MESSAGE_APPS
             for (t in texts) {
                 if (title.isEmpty() && t.isEmpty()) continue
-                val item = SavedNotification(0, sbn.key, sbn.packageName, app, sub, title, t.take(1500), sbn.postTime, isEmail, isMessage)
+                val item = SavedNotification(0, sbn.key, sbn.packageName, app, sub, title, t.take(1500), sbn.postTime, isEmail, isMessage, account)
                 if (store.save(item)) {
                     fresh += item
                     if (!isMessage && !isEmail) {
@@ -80,6 +81,23 @@ class NotificationReader : NotificationListenerService() {
             }
         }
         if (alert && fresh.isNotEmpty()) checkAlerts(fresh)
+    }
+
+    /** "u<user>" (twin copies run as another Android user) + "|<the account's own name>" when the app tells us. */
+    private fun accountOf(sbn: StatusBarNotification, extras: Bundle, style: NotificationCompat.MessagingStyle?): String {
+        val user = "u" + sbn.user.hashCode()
+        if (sbn.packageName !in MESSAGE_APPS) return user
+        val generic = setOf("you", "me", "أنت", "انت", "أنا", "انا")
+        val candidates = listOf(
+            style?.user?.name?.toString(),
+            extras.getCharSequence("android.selfDisplayName")?.toString(),
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
+        )
+        val self = candidates.map { it?.trim().orEmpty() }.firstOrNull { c ->
+            c.isNotEmpty() && c.lowercase() !in generic && c.length <= 40 &&
+                !Regex("\\d+\\s*(new )?(messages?|رسائل|رسالة|رسايل|محادثات|chats?)", RegexOption.IGNORE_CASE).containsMatchIn(c)
+        }
+        return if (self != null) "$user|$self" else user
     }
 
     private fun checkAlerts(items: List<SavedNotification>) {

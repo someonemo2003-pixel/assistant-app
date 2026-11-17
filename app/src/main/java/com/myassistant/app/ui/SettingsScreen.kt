@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.myassistant.app.ui
 
 import androidx.compose.foundation.clickable
@@ -372,7 +374,7 @@ private fun MailCard(vm: AppViewModel) {
                 Column(Modifier.weight(1f)) {
                     Text("التقرير اليومي", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "إيميلات آخر ٢٤ ساعة + الرسايل + مواعيد النهارده، في إشعار ومحادثة.",
+                        "اختار هيبقى فيه إيه. وتقدر تطلب أي تقرير من الشات: \"تقرير الجيميل بس\" أو \"تقرير واتس التوأم\".",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -385,7 +387,47 @@ private fun MailCard(vm: AppViewModel) {
                 }) { Text("الميعاد: " + String.format(java.util.Locale.US, "%02d:%02d", vm.reportHour, vm.reportMinute)) }
                 TextButton(onClick = { vm.reportNow() }) { Text("جرّب التقرير دلوقتي") }
             }
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.myassistant.app.mail.DailyReport.SOURCES.forEach { (k, label) ->
+                    FilterChip(selected = k in vm.reportSources, onClick = { vm.toggleReportSource(k) }, label = { Text(label) })
+                }
+            }
+            AccountsSection(vm)
         }
+    }
+}
+
+/** WhatsApp (and twin) accounts the assistant has seen, with names the user picks. */
+@Composable
+private fun AccountsSection(vm: AppViewModel) {
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadAccounts() }
+    if (vm.chatAccounts.isEmpty()) return
+    var editing by remember { mutableStateOf<AppViewModel.ChatAccount?>(null) }
+    HorizontalDivider()
+    Text("حسابات الشات", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "كل نسخة/حساب ظهر في الإشعارات. سمّي كل واحد (مثلاً شخصي، شغل) عشان تطلب تقريره لوحده.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    vm.chatAccounts.forEach { a ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(a.label, style = MaterialTheme.typography.bodyMedium)
+                Text("${a.count} رسالة · ${a.raw}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = { editing = a }) { Icon(Icons.Filled.Edit, "تسمية") }
+        }
+    }
+    editing?.let { a ->
+        var name by remember(a) { mutableStateOf(a.custom.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("اسم الحساب") },
+            text = { OutlinedTextField(name, { name = it }, placeholder = { Text("مثلاً: شغل") }, singleLine = true) },
+            confirmButton = { TextButton(onClick = { vm.renameAccount(a, name); editing = null }) { Text("حفظ") } },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("إلغاء") } },
+        )
     }
 }
 

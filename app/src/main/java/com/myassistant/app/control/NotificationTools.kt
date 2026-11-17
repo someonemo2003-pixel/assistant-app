@@ -14,10 +14,10 @@ import java.util.Locale
 
 private const val OFF = "Notification access is OFF. Tell the user: ⚙️ → الصلاحيات → قراءة الإشعارات."
 
-private fun line(n: SavedNotification, fmt: SimpleDateFormat): String {
+private fun line(n: SavedNotification, fmt: SimpleDateFormat, app: String = n.app): String {
     val where = if (n.conversation.isNotBlank() && n.conversation != n.sender) " in \"${n.conversation}\"" else ""
     val kind = if (n.isEmail) "📧 " else ""
-    return "[${fmt.format(Date(n.time))}] $kind${n.app} · ${n.sender}$where: ${n.text}"
+    return "[${fmt.format(Date(n.time))}] $kind$app · ${n.sender}$where: ${n.text}"
 }
 
 class ReadNotificationsTool : Tool {
@@ -31,22 +31,28 @@ class ReadNotificationsTool : Tool {
         "hours" to Schema.integer("How far back, in hours (default 24, max 720)"),
         "type" to Schema.string("all | messages | emails"),
         "limit" to Schema.integer("Max items, default 25"),
+        "account" to Schema.string("Optional: only one account/copy of an app, e.g. 'توأم' (WhatsApp twin) or a name the user gave it"),
     )
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String = withContext(Dispatchers.IO) {
         if (!NotificationReader.isEnabled(ctx.app)) return@withContext OFF
         val hours = (args.int("hours") ?: 24).coerceIn(1, 720)
         val type = args.str("type")
-        val list = NotificationStore.get(ctx.app).query(
+        val store = NotificationStore.get(ctx.app)
+        val accs = args.str("account").takeIf { it.isNotBlank() }?.let { Accounts.match(ctx.app, it) }
+        fun q(pkgs: List<String> = emptyList(), account: String? = null) = store.query(
             sinceMs = System.currentTimeMillis() - hours * 3_600_000L,
             filter = args.str("filter"),
             onlyEmail = type == "emails",
             onlyMessages = type == "messages",
             limit = (args.int("limit") ?: 25).coerceIn(1, 100),
+            pkgs = pkgs, account = account,
         )
+        if (accs != null && accs.isEmpty()) return@withContext "No account matches \"${args.str("account")}\""
+        val list = accs?.flatMap { (p, a) -> q(listOf(p), a) }?.sortedByDescending { it.time } ?: q()
         if (list.isEmpty()) return@withContext "Nothing found in the last $hours hours"
         val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.US)
-        list.joinToString("\n") { line(it, fmt) }
+        list.joinToString("\n") { line(it, fmt, Accounts.label(ctx.app, it)) }
     }
 }
 
@@ -69,7 +75,7 @@ class MissedMessagesTool : Tool {
         val fmt = SimpleDateFormat("HH:mm", Locale.US)
         buildString {
             appendLine("${items.size} items in the last $hours hours:")
-            items.groupBy { it.app to (it.conversation.ifBlank { it.sender }) }
+            items.groupBy { Accounts.label(ctx.app, it) to (it.conversation.ifBlank { it.sender }) }
                 .entries.sortedByDescending { e -> e.value.maxOf { it.time } }
                 .take(30)
                 .forEach { (k, v) ->
