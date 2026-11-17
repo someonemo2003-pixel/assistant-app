@@ -62,9 +62,29 @@ class ScreenService : AccessibilityService() {
         runCatching { focusGuard(event) }
         val pkg = event.packageName?.toString() ?: return
         val isStore = pkg in com.myassistant.app.admin.DeviceOwner.STORE_PKGS || "packageinstaller" in pkg || "permissioncontroller" in pkg
-        if (!isStore) return
+        if (!isStore) {
+            if (pkg != "com.android.systemui" && pkg != packageName) clearCovers()
+            return
+        }
         val now = SystemClock.uptimeMillis()
-        if (now - lastGuardAt < 350) return
+        if (now - lastGuardAt < 300) {
+            // Run once more after things settle, so covers follow scrolling.
+            if (!recheckPosted) {
+                recheckPosted = true
+                handler.postDelayed({
+                    recheckPosted = false
+                    runCatching {
+                        val r = rootInActiveWindow
+                        val p = r?.packageName?.toString()
+                        if (r != null && p != null && p in com.myassistant.app.admin.DeviceOwner.STORE_PKGS) {
+                            lastGuardAt = SystemClock.uptimeMillis()
+                            storeGuard(r, com.myassistant.app.admin.DeviceOwner.blocked(this))
+                        }
+                    }
+                }, 350)
+            }
+            return
+        }
         lastGuardAt = now
         val root = rootInActiveWindow ?: return
         val texts = ArrayList<String>()
@@ -106,24 +126,103 @@ class ScreenService : AccessibilityService() {
             return
         }
 
-        // 3) A blocked app's own page in the store, or its installer. Must be precise: store home pages and
-        //    search lists mention many apps, so we only act when the app's name is a title on screen AND there
-        //    is exactly one install button (the app's detail page), or when the system installer shows it.
-        val installer = "packageinstaller" in pkg
-        val trimmed = texts.map { it.trim() }
-        val hit = com.myassistant.app.admin.DeviceOwner.blocked(this).firstOrNull { b ->
-            (b.name.length >= 3 && trimmed.any { it.equals(b.name, true) || it.startsWith(b.name + ":", true) || it.startsWith(b.name + " -", true) }) ||
-                (b.pkg != null && trimmed.any { it == b.pkg })
-        } ?: return
-        if (!installer) {
-            // The app's own page has one (sometimes two) install buttons; search results / home lists have many.
-            val installWords = setOf("تثبيت", "install", "تنزيل", "get", "تحديث", "update", "تثبيت التطبيق", "install app")
-            val buttons = labels.count { it.lowercase() in installWords }
-            if (buttons !in 1..2) return
+        val blockedApps = com.myassistant.app.admin.DeviceOwner.blocked(this)
+        if (blockedApps.isEmpty()) { clearCovers(); return }
+
+        // 3) The system installer (APK files): just leave it.
+        if ("packageinstaller" in pkg) {
+            val trimmed = texts.map { it.trim() }
+            val hit = blockedApps.firstOrNull { b -> b.name.length >= 3 && trimmed.any { it.equals(b.name, true) } } ?: return
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            toast("🚫 ${hit.name} ممنوع على الموبايل ده")
+            return
         }
-        performGlobalAction(GLOBAL_ACTION_BACK)
-        performGlobalAction(GLOBAL_ACTION_HOME)
-        toast("🚫 ${hit.name} ممنوع على الموبايل ده")
+
+        // 4) Stores: cover only the install button that belongs to a blocked app, and cancel a download if one started.
+        storeGuard(root, blockedApps)
+    }
+
+    private val handler by lazy { android.os.Handler(mainLooper) }
+    @Volatile private var recheckPosted = false
+    private val covers = ArrayList<android.view.View>()
+
+    private val installWords = listOf("تثبيت", "Install", "تنزيل", "Get", "تحديث", "Update")
+    private val cancelWords = listOf("إلغاء", "Cancel")
+
+    private fun label(n: AccessibilityNodeInfo) = (n.text ?: n.contentDescription)?.toString()?.trim().orEmpty()
+
+    /** Nodes on screen whose own label is exactly one of [words]. */
+    private fun exact(root: AccessibilityNodeInfo, words: List<String>): List<AccessibilityNodeInfo> =
+        words.flatMap { w -> root.findAccessibilityNodeInfosByText(w).filter { label(it).equals(w, true) } }
+            .distinctBy { val r = Rect(); it.getBoundsInScreen(r); r.toShortString() }
+
+    /** Smallest ancestor (within a few levels) whose subtree shows the blocked app's name, if it's "its" card/page. */
+    private fun ownerCard(btn: AccessibilityNodeInfo, name: String): AccessibilityNodeInfo? {
+        var n: AccessibilityNodeInfo? = btn.parent
+        var depth = 0
+        while (n != null && depth < 10) {
+            val hasName = n.findAccessibilityNodeInfosByText(name).any { label(it).equals(name, true) || label(it).startsWith("$name:", true) || label(it).startsWith("$name -", true) }
+            if (hasName) return if (exact(n, installWords).size <= 2) n else null
+            n = n.parent; depth++
+        }
+        return null
+    }
+
+    private fun storeGuard(root: AccessibilityNodeInfo, blocked: List<com.myassistant.app.admin.BlockedApp>) {
+        val buttons = exact(root, installWords)
+        val cancels = exact(root, cancelWords)
+        val toCover = ArrayList<Rect>()
+        var hitName: String? = null
+        for (b in blocked) {
+            if (b.name.length < 3) continue
+            for (btn in buttons) {
+                ownerCard(btn, b.name) ?: continue
+                val r = Rect(); btn.getBoundsInScreen(r)
+                if (r.width() > 0 && r.height() > 0) { toCover += r; hitName = b.name }
+            }
+            // A download already started: press its Cancel.
+            for (c in cancels) {
+                if (ownerCard(c, b.name) != null) {
+                    val target = generateSequence(c) { it.parent }.take(3).firstOrNull { it.isClickable }
+                    if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) toast("🚫 ${b.name} ممنوع — لغيت التحميل")
+                }
+            }
+        }
+        handler.post { showCovers(toCover, hitName) }
+    }
+
+    private fun clearCovers() = handler.post {
+        val wm = getSystemService(android.view.WindowManager::class.java)
+        covers.forEach { runCatching { wm.removeView(it) } }
+        covers.clear()
+    }
+
+    /** Draws a "blocked" label over each button; it swallows taps so the button can't be pressed. */
+    private fun showCovers(rects: List<Rect>, name: String?) {
+        val wm = getSystemService(android.view.WindowManager::class.java)
+        covers.forEach { runCatching { wm.removeView(it) } }
+        covers.clear()
+        for (r in rects) {
+            val v = android.widget.TextView(this).apply {
+                text = "🚫 ممنوع"
+                gravity = android.view.Gravity.CENTER
+                setTextColor(android.graphics.Color.WHITE)
+                textSize = 14f
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(android.graphics.Color.parseColor("#E5DC2626")); cornerRadius = r.height() / 2f
+                }
+                setOnClickListener { toast("🚫 ${name ?: "البرنامج ده"} ممنوع على الموبايل ده") }
+            }
+            val lp = android.view.WindowManager.LayoutParams(
+                r.width(), r.height(), r.left, r.top,
+                android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                android.graphics.PixelFormat.TRANSLUCENT,
+            ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.LEFT }
+            if (runCatching { wm.addView(v, lp) }.isSuccess) covers += v
+        }
     }
 
     private fun toast(t: String) = android.os.Handler(mainLooper).post {
