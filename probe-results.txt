@@ -1,0 +1,89 @@
+======================================================================
+REPO onnx-community/embeddinggemma-300m-ONNX
+  file added_tokens.json 35
+  file config.json 1765
+  file generation_config.json 133
+  file onnx/model.onnx 479932
+  file onnx/model.onnx_data 1234521088
+  file onnx/model_fp16.onnx 655263
+  file onnx/model_fp16.onnx_data 617434112
+  file onnx/model_no_gather_q4.onnx 529476
+  file onnx/model_no_gather_q4.onnx_data 194628608
+  file onnx/model_q4.onnx 519322
+  file onnx/model_q4.onnx_data 196725760
+  file onnx/model_q4f16.onnx 705221
+  file onnx/model_q4f16.onnx_data 175410176
+  file onnx/model_quantized.onnx 567874
+  file onnx/model_quantized.onnx_data 308890624
+  file special_tokens_map.json 662
+  file tokenizer.json 20323312
+  file tokenizer.model 4689074
+  file tokenizer_config.json 1156830
+tokenizer model type: BPE byte_fallback: True ignore_merges: False fuse_unk: True unk: <unk>
+vocab size: 262144 merges: 514906
+merge sample: [['\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n', '\n'], ['▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁', '▁'], ['\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t', '\t']]
+normalizer: {"type": "Replace", "pattern": {"String": " "}, "content": "▁"}
+pre_tokenizer: {"type": "Split", "pattern": {"String": " "}, "behavior": "MergedWithPrevious", "invert": false}
+post_processor: {"type": "TemplateProcessing", "single": [{"SpecialToken": {"id": "<bos>", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}, {"SpecialToken": {"id": "<eos>", "type_id": 0}}], "pair": [{"SpecialToken": {"id": "<bos>", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}, {"SpecialToken": {"id": "<eos>", "type_id": 0}}, {"SpecialToken": {"id": "<bos>", "type_id": 1}}, {"Sequence": {"id": "B", "type_id": 1}}, {"SpecialToken": {"id": "<eos>", "type_id": 1}}], "special_tokens": {"<bos>": {"id": "<bos>", "ids": [2], "tokens": ["<bos>"]}, "<eos>": {"id": "<eos>", "ids": [1], "tokens": ["<eo
+decoder: {"type": "Sequence", "decoders": [{"type": "Replace", "pattern": {"String": "▁"}, "content": " "}, {"type": "ByteFallback"}, {"type": "Fuse"}]}
+added_tokens (first 6): [(0, '<pad>'), (1, '<eos>'), (2, '<bos>'), (3, '<unk>'), (4, '<mask>'), (5, '[multimodal]')]
+ids صحيني الساعة 7 الصبح -> [2, 8071, 236787, 13315, 25411, 1109, 7609, 236787, 26074, 43091, 162684, 236743, 236832, 12638, 54694, 1] ['<bos>', 'task', ':', '▁sentence', '▁similarity', '▁|', '▁query', ':', '▁صح', 'يني', '▁الساعة', '▁', '7', '▁الص', 'بح', '<eos>']
+ids عايز أصحى بدري بكرة -> [2, 8071, 236787, 13315, 25411, 1109, 7609, 236787, 65518, 3506, 82644, 237150, 17682, 6488, 1100, 68305, 1] ['<bos>', 'task', ':', '▁sentence', '▁similarity', '▁|', '▁query', ':', '▁عايز', '▁أ', 'صح', 'ى', '▁بد', 'ري', '▁ب', 'كرة', '<eos>']
+ids اظبطلي منبه على سبعة -> [2, 8071, 236787, 13315, 25411, 1109, 7609, 236787, 92266, 44124, 7645, 3256, 14909, 5793, 17305, 19451, 1] ['<bos>', 'task', ':', '▁sentence', '▁similarity', '▁|', '▁query', ':', '▁اظ', 'بط', 'لي', '▁من', 'به', '▁على', '▁سب', 'عة', '<eos>']
+ids افتح يوتيوب -> [2, 8071, 236787, 13315, 25411, 1109, 7609, 236787, 65139, 236989, 3099, 144802, 7366, 1] ['<bos>', 'task', ':', '▁sentence', '▁similarity', '▁|', '▁query', ':', '▁افت', 'ح', '▁ي', 'وتي', 'وب', '<eos>']
+using model file onnx/model_q4.onnx
+inputs: [('input_ids', 'tensor(int64)', ['batch_size', 'sequence_length']), ('attention_mask', 'tensor(int64)', ['batch_size', 'total_sequence_length'])]
+outputs: [('last_hidden_state', 'tensor(float)', ['batch_size', 'sequence_length', 768]), ('sentence_embedding', 'tensor(float)', ['batch_size', 768])]
+avg ms per sentence (CI cpu): 11.1 dim 768
+similarity matrix:
+ 0 1.00 0.65 0.75 0.47 0.55 0.51 0.57 0.48 0.44 0.57 | صحيني الساعة 7 الصبح
+ 1 0.65 1.00 0.65 0.57 0.67 0.68 0.61 0.51 0.44 0.59 | عايز أصحى بدري بكرة
+ 2 0.75 0.65 1.00 0.54 0.58 0.54 0.54 0.48 0.45 0.62 | اظبطلي منبه على سبعة
+ 3 0.47 0.57 0.54 1.00 0.61 0.77 0.42 0.42 0.39 0.50 | افتح يوتيوب
+ 4 0.55 0.67 0.58 0.61 1.00 0.63 0.49 0.47 0.44 0.60 | شغللي الفيس
+ 5 0.51 0.68 0.54 0.77 0.63 1.00 0.47 0.41 0.38 0.51 | عايز أتفرج على فيديوهات
+ 6 0.57 0.61 0.54 0.42 0.49 0.47 1.00 0.69 0.52 0.51 | ميعاد الدكتور إمتى؟
+ 7 0.48 0.51 0.48 0.42 0.47 0.41 0.69 1.00 0.52 0.51 | حجزت عند دكتور الأسنان يوم الخميس
+ 8 0.44 0.44 0.45 0.39 0.44 0.38 0.52 0.52 1.00 0.45 | عيد ميلاد أمي يوم 5 مارس
+ 9 0.57 0.59 0.62 0.50 0.60 0.51 0.51 0.51 0.45 1.00 | وضع النوم
+======================================================================
+REPO Xenova/multilingual-e5-small
+  file config.json 658
+  file onnx/model.onnx 470268533
+  file onnx/model_bnb4.onnx 397322585
+  file onnx/model_fp16.onnx 235336732
+  file onnx/model_int8.onnx 118054593
+  file onnx/model_q4.onnx 398649233
+  file onnx/model_q4f16.onnx 204777691
+  file onnx/model_quantized.onnx 118308185
+  file onnx/model_uint8.onnx 118054630
+  file quant_config.json 674
+  file special_tokens_map.json 167
+  file tokenizer.json 17082730
+  file tokenizer_config.json 443
+tokenizer model type: Unigram byte_fallback: None ignore_merges: None fuse_unk: None unk: 3
+vocab size: 250002 merges: 0
+normalizer: {"type": "Sequence", "normalizers": [{"type": "Precompiled", "precompiled_charsmap": "ALQCAACEAAAAAACAAQAAgMz8AgC4BQAAhyIAgMzkAgC4PQAAeyIAgMzsAgC4BQAAiyIAgMw8AADNvAAAmwkAgJ4JAIChCQCAgx0AAIAZAACBGQAAPR0AgDUdAIBNHQCARR0AgIAxAACBMQAApAkAgIkxAAA9WAMAPEgDAEAKAIA+aAMAAYUAAIQBAQADjQAAAokAAAWVAAAEkQAAB50AAAaZAAAJqQAACKEAAAutAAAKpQAADbkAAAy9AAAPvQAADrkAABHFAAAQwQAAE80AABLJAAAV1QAAFNEAABfdAAAW2QAAGeUAABjhAA
+pre_tokenizer: {"type": "Metaspace", "replacement": "▁", "add_prefix_space": true}
+post_processor: {"type": "TemplateProcessing", "single": [{"SpecialToken": {"id": "<s>", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}, {"SpecialToken": {"id": "</s>", "type_id": 0}}], "pair": [{"SpecialToken": {"id": "<s>", "type_id": 0}}, {"Sequence": {"id": "A", "type_id": 0}}, {"SpecialToken": {"id": "</s>", "type_id": 0}}, {"SpecialToken": {"id": "</s>", "type_id": 0}}, {"Sequence": {"id": "B", "type_id": 0}}, {"SpecialToken": {"id": "</s>", "type_id": 0}}], "special_tokens": {"</s>": {"id": "</s>", "ids": [2], "tokens": ["</s>"]}, "<s>": {"id": "<s>", "ids": [0], "tokens": ["<s>"]}}}
+decoder: {"type": "Metaspace", "replacement": "▁", "add_prefix_space": true}
+added_tokens (first 6): [(0, '<s>'), (1, '<pad>'), (2, '</s>'), (3, '<unk>'), (250001, '<mask>')]
+ids صحيني الساعة 7 الصبح -> [0, 41, 1294, 12, 6, 26220, 44180, 75049, 361, 359, 64171, 2] ['<s>', '▁que', 'ry', ':', '▁', 'صح', 'يني', '▁الساعة', '▁7', '▁ال', 'صبح', '</s>']
+ids عايز أصحى بدري بكرة -> [0, 41, 1294, 12, 50918, 13823, 1333, 26220, 902, 92309, 179, 161038, 250, 2] ['<s>', '▁que', 'ry', ':', '▁عا', 'يز', '▁أ', 'صح', 'ى', '▁بدر', 'ي', '▁بكر', 'ة', '</s>']
+ids اظبطلي منبه على سبعة -> [0, 41, 1294, 12, 6, 75320, 48784, 5703, 230, 6963, 556, 5818, 15780, 2] ['<s>', '▁que', 'ry', ':', '▁', 'اظ', 'بط', 'لي', '▁من', 'به', '▁على', '▁سب', 'عة', '</s>']
+ids افتح يوتيوب -> [0, 41, 1294, 12, 878, 58516, 11467, 6267, 7782, 2] ['<s>', '▁que', 'ry', ':', '▁ا', 'فتح', '▁يو', 'تي', 'وب', '</s>']
+using model file onnx/model_quantized.onnx
+inputs: [('input_ids', 'tensor(int64)', ['batch_size', 'sequence_length']), ('attention_mask', 'tensor(int64)', ['batch_size', 'sequence_length']), ('token_type_ids', 'tensor(int64)', ['batch_size', 'sequence_length'])]
+outputs: [('last_hidden_state', 'tensor(float)', ['batch_size', 'sequence_length', 384])]
+avg ms per sentence (CI cpu): 1.2 dim 384
+similarity matrix:
+ 0 1.00 0.89 0.92 0.85 0.85 0.85 0.80 0.88 0.86 0.87 | صحيني الساعة 7 الصبح
+ 1 0.89 1.00 0.88 0.87 0.85 0.90 0.80 0.87 0.85 0.84 | عايز أصحى بدري بكرة
+ 2 0.92 0.88 1.00 0.86 0.86 0.87 0.78 0.87 0.83 0.85 | اظبطلي منبه على سبعة
+ 3 0.85 0.87 0.86 1.00 0.85 0.91 0.77 0.83 0.83 0.84 | افتح يوتيوب
+ 4 0.85 0.85 0.86 0.85 1.00 0.84 0.77 0.83 0.81 0.84 | شغللي الفيس
+ 5 0.85 0.90 0.87 0.91 0.84 1.00 0.78 0.86 0.84 0.83 | عايز أتفرج على فيديوهات
+ 6 0.80 0.80 0.78 0.77 0.77 0.78 1.00 0.84 0.81 0.78 | ميعاد الدكتور إمتى؟
+ 7 0.88 0.87 0.87 0.83 0.83 0.86 0.84 1.00 0.85 0.82 | حجزت عند دكتور الأسنان يوم الخميس
+ 8 0.86 0.85 0.83 0.83 0.81 0.84 0.81 0.85 1.00 0.80 | عيد ميلاد أمي يوم 5 مارس
+ 9 0.87 0.84 0.85 0.84 0.84 0.83 0.78 0.82 0.80 1.00 | وضع النوم
