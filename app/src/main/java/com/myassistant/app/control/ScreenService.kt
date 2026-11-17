@@ -83,13 +83,20 @@ class ScreenService : AccessibilityService() {
             return
         }
 
-        // 3) A blocked app's page in the store or its installer.
-        val hit = com.myassistant.app.admin.DeviceOwner.blocked(this).firstOrNull { b ->
-            (b.name.length >= 3 && all.contains(b.name, ignoreCase = true)) || (b.pkg != null && all.contains(b.pkg))
-        } ?: return
-        // In stores, only act on pages that offer to install it (not every list that mentions the name).
+        // 3) A blocked app's own page in the store, or its installer. Must be precise: store home pages and
+        //    search lists mention many apps, so we only act when the app's name is a title on screen AND there
+        //    is exactly one install button (the app's detail page), or when the system installer shows it.
         val installer = "packageinstaller" in pkg
-        if (!installer && !Regex("تثبيت|تنزيل|Install|Get|Download|تحديث|Update", RegexOption.IGNORE_CASE).containsMatchIn(all)) return
+        val trimmed = texts.map { it.trim() }
+        val hit = com.myassistant.app.admin.DeviceOwner.blocked(this).firstOrNull { b ->
+            (b.name.length >= 3 && trimmed.any { it.equals(b.name, true) || it.startsWith(b.name + ":", true) || it.startsWith(b.name + " -", true) }) ||
+                (b.pkg != null && trimmed.any { it == b.pkg })
+        } ?: return
+        if (!installer) {
+            val installWords = setOf("تثبيت", "install", "تنزيل", "تحديث", "update", "تثبيت التطبيق")
+            val buttons = trimmed.count { it.lowercase() in installWords }
+            if (buttons != 1) return
+        }
         performGlobalAction(GLOBAL_ACTION_BACK)
         performGlobalAction(GLOBAL_ACTION_HOME)
         toast("🚫 ${hit.name} ممنوع على الموبايل ده")
