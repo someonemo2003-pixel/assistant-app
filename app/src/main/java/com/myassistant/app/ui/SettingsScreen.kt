@@ -141,7 +141,7 @@ fun SettingsScreen(vm: AppViewModel) {
                             handsFree,
                         ) { vm.settings.setHandsFree(it) }
                         Text(
-                            "طرق سريعة تكلمه بيها: دوس مطوّل على أيقونة التطبيق ← \"اتكلم\"، أو ضيف زرار \"كلّم مساعدي\" " +
+                            "طرق سريعة تكلمه بيها: دوس مطوّل على أيقونة التطبيق ← \"اتكلم\"، أو ضيف زرار \"كلّم Nova\" " +
                                 "في شريط الإعدادات السريعة (اسحب لتحت ← ✏️ تعديل)، أو اختاره مساعد افتراضي من " +
                                 "الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← المساعد.",
                             style = MaterialTheme.typography.bodySmall,
@@ -732,7 +732,7 @@ private fun GuardCard() {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("🛡️ التحكم الكامل", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                if (owner) "✅ مالك الجهاز شغال: المنع من النظام نفسه، ومساعدي مايتمسحش." else "⚪ مالك الجهاز مش مفعّل — المنع شغال بالتحكم في الشاشة بس.",
+                if (owner) "✅ مالك الجهاز شغال: المنع من النظام نفسه، وNova مايتمسحش." else "⚪ مالك الجهاز مش مفعّل — المنع شغال بالتحكم في الشاشة بس.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -778,7 +778,7 @@ private fun GuardCard() {
                         visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
                     if (what == "setpin") OutlinedTextField(new, { new = it }, label = { Text("الرقم الجديد (فاضي = من غير رقم)") }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                    if (what == "release") Text("هترجع للمنع بالتحكم في الشاشة بس، ومساعدي هيبقى ينفع يتمسح.")
+                    if (what == "release") Text("هترجع للمنع بالتحكم في الشاشة بس، وNova هيبقى ينفع يتمسح.")
                 }
             },
             confirmButton = {

@@ -108,7 +108,7 @@ fun ChatScreen(vm: AppViewModel) {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("مساعدي", fontWeight = FontWeight.Bold)
+                        Text("Nova", fontWeight = FontWeight.Bold)
                         Text(
                             if (readyCount > 0) "$readyCount مزوّد جاهز" else "محتاج مفتاح API — افتح الإعدادات",
                             style = MaterialTheme.typography.labelSmall,

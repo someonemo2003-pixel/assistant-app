@@ -171,7 +171,7 @@ object FastParser {
 
     // ---------- learned phrases ----------
 
-    private val politeWords = setOf("لو", "سمحت", "فضلك", "please", "pls", "بقي", "يا", "مساعدي", "ممكن", "عايزك", "عاوزك")
+    private val politeWords = setOf("لو", "سمحت", "فضلك", "please", "pls", "بقي", "يا", "مساعدي", "nova", "نوفا", "ممكن", "عايزك", "عاوزك")
 
     /** Stable key for a learned phrase: normalised, without polite filler words. */
     fun phraseKey(text: String): String =

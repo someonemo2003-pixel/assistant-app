@@ -71,7 +71,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="مساعدي"
+        android:label="Nova"
         android:supportsRtl="true"
         android:theme="@style/Theme.Assistant">
 
@@ -104,7 +104,7 @@
             android:name=".voice.MicTileService"
             android:exported="true"
             android:icon="@drawable/ic_mic"
-            android:label="كلّم مساعدي"
+            android:label="كلّم Nova"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -127,7 +127,7 @@
         <service
             android:name=".control.NotificationReader"
             android:exported="false"
-            android:label="مساعدي"
+            android:label="Nova"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

@@ -76,10 +76,10 @@ class ScreenService : AccessibilityService() {
 
         // 2) Someone trying to uninstall the assistant while a PIN is set.
         if (("packageinstaller" in pkg || "permissioncontroller" in pkg) && com.myassistant.app.admin.DeviceOwner.hasPin(this) &&
-            all.contains("مساعدي") && Regex("إلغاء التثبيت|uninstall|حذف التطبيق|إزالة التطبيق|إلغاء تثبيت", RegexOption.IGNORE_CASE).containsMatchIn(all)
+            (all.contains("Nova") || all.contains("مساعدي")) && Regex("إلغاء التثبيت|uninstall|حذف التطبيق|إزالة التطبيق|إلغاء تثبيت", RegexOption.IGNORE_CASE).containsMatchIn(all)
         ) {
             performGlobalAction(GLOBAL_ACTION_BACK)
-            toast("🔒 مساعدي محمي — شيل الحماية من الإعدادات بالرقم السري")
+            toast("🔒 Nova محمي — شيل الحماية من الإعدادات بالرقم السري")
             return
         }
 

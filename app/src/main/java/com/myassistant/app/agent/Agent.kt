@@ -144,7 +144,7 @@ class Agent(
         }
         val now = SimpleDateFormat("EEEE yyyy-MM-dd HH:mm", Locale.US).format(Date())
         return buildString {
-            appendLine("You are \"مساعدي\" (My Assistant), a personal assistant living on the user's Android phone.")
+            appendLine("You are \"Nova\" (نوفا), a personal assistant living on the user's Android phone.")
             appendLine("- Reply in the user's language. For Arabic, use friendly, short Egyptian Arabic.")
             appendLine("- Prefer doing things with your tools over explaining how to do them.")
             appendLine("- When the user shares a lasting fact about themselves, save it with the remember tool and the right category (personal, people, work, health, money, places, dates, preferences, general).")
