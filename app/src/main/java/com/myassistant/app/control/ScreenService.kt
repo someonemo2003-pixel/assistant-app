@@ -68,10 +68,15 @@ class ScreenService : AccessibilityService() {
         lastGuardAt = now
         val root = rootInActiveWindow ?: return
         val texts = ArrayList<String>()
+        // One label per node (text, else description) so a button isn't counted twice.
+        val labels = ArrayList<String>()
         fun walk(n: AccessibilityNodeInfo?, depth: Int) {
-            if (n == null || depth > 25 || texts.size > 400) return
-            n.text?.let { texts += it.toString() }
-            n.contentDescription?.let { texts += it.toString() }
+            if (n == null || depth > 30 || texts.size > 600) return
+            val t = n.text?.toString()
+            val d = n.contentDescription?.toString()
+            t?.let { texts += it }
+            d?.let { texts += it }
+            (t ?: d)?.trim()?.takeIf { it.isNotEmpty() }?.let { labels += it }
             for (i in 0 until n.childCount) walk(n.getChild(i), depth + 1)
         }
         walk(root, 0)
@@ -111,9 +116,10 @@ class ScreenService : AccessibilityService() {
                 (b.pkg != null && trimmed.any { it == b.pkg })
         } ?: return
         if (!installer) {
-            val installWords = setOf("تثبيت", "install", "تنزيل", "تحديث", "update", "تثبيت التطبيق")
-            val buttons = trimmed.count { it.lowercase() in installWords }
-            if (buttons != 1) return
+            // The app's own page has one (sometimes two) install buttons; search results / home lists have many.
+            val installWords = setOf("تثبيت", "install", "تنزيل", "get", "تحديث", "update", "تثبيت التطبيق", "install app")
+            val buttons = labels.count { it.lowercase() in installWords }
+            if (buttons !in 1..2) return
         }
         performGlobalAction(GLOBAL_ACTION_BACK)
         performGlobalAction(GLOBAL_ACTION_HOME)
