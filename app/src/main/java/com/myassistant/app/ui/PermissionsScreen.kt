@@ -56,6 +56,7 @@ fun PermissionsScreen(vm: AppViewModel) {
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { tick++ }
     val askScreen by vm.settings.askBeforeScreen.collectAsState()
+    val confirmSends by vm.settings.confirmSends.collectAsState()
 
     fun open(intent: Intent) {
         runCatching { ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -113,13 +114,27 @@ fun PermissionsScreen(vm: AppViewModel) {
                         Column(Modifier.weight(1f)) {
                             Text("يسألني قبل ما يتحكم في الشاشة", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "مرة واحدة في كل طلب. لو قفلته، هيدوس ويكتب في التطبيقات من غير ما يسأل. " +
-                                    "(الإرسال والمكالمات بيسأل فيهم دايماً)",
+                                "مرة واحدة في كل طلب. لو قفلته، هيدوس ويكتب في التطبيقات من غير ما يسأل.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Switch(checked = askScreen, onCheckedChange = { vm.settings.setAskBeforeScreen(it) })
+                    }
+                }
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("يسألني قبل الإرسال والمكالمات", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "واتساب، SMS، إيميل، مكالمات. مقفول = ينفّذ على طول لما تطلب.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = confirmSends, onCheckedChange = { vm.settings.setConfirmSends(it) })
                     }
                 }
             }

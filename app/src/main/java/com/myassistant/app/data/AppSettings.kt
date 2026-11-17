@@ -44,6 +44,11 @@ class AppSettings(context: Context) {
     val actionBrain: StateFlow<String> = _actionBrain.asStateFlow()
     fun setActionBrain(id: String) { prefs.edit().putString(ACTION_BRAIN, id).apply(); _actionBrain.value = id }
 
+    private val _confirmSends = MutableStateFlow(prefs.getBoolean(CONFIRM_SENDS, false))
+    /** Ask before sending messages/emails/SMS and calling. Off = just do it. */
+    val confirmSends: StateFlow<Boolean> = _confirmSends.asStateFlow()
+    fun setConfirmSends(on: Boolean) { prefs.edit().putBoolean(CONFIRM_SENDS, on).apply(); _confirmSends.value = on }
+
     fun setLearnFromAi(on: Boolean) {
         prefs.edit().putBoolean(LEARN, on).apply()
         _learnFromAi.value = on
@@ -61,6 +66,7 @@ class AppSettings(context: Context) {
         const val SPEAK = "speak_replies"
         const val HANDS_FREE = "hands_free"
         const val CHAT_BRAIN = "chat_brain"
+        const val CONFIRM_SENDS = "confirm_sends"
         const val ACTION_BRAIN = "action_brain"
     }
 }
