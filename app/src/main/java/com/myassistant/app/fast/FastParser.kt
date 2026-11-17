@@ -144,6 +144,18 @@ object FastParser {
         else -> null
     }
 
+    // ---------- learned phrases ----------
+
+    private val politeWords = setOf("لو", "سمحت", "فضلك", "please", "pls", "بقي", "يا", "مساعدي", "ممكن", "عايزك", "عاوزك")
+
+    /** Stable key for a learned phrase: normalised, without polite filler words. */
+    fun phraseKey(text: String): String =
+        normalize(text).split(' ').filter { it.isNotEmpty() && it !in politeWords }.joinToString(" ")
+            .replace(" من ", " ").trim()
+
+    /** All numbers in a phrase (used so "صحيني 7" never replays a learned "صحيني 8"). */
+    fun numbers(text: String): List<String> = Regex("\\d+").findAll(normalize(text)).map { it.value }.toList()
+
     // ---------- text helpers ----------
 
     fun normalize(s: String): String {

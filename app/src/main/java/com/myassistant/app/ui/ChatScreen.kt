@@ -32,7 +32,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
@@ -100,9 +101,10 @@ fun ChatScreen(vm: AppViewModel) {
                     IconButton(onClick = { vm.screen = Screen.Settings }) { Icon(Icons.Filled.Settings, "الإعدادات") }
                 },
                 actions = {
+                    IconButton(onClick = { vm.screen = Screen.Chats }) { Icon(Icons.AutoMirrored.Filled.List, "المحادثات") }
                     IconButton(onClick = { vm.screen = Screen.Memory }) { Icon(Icons.Filled.Star, "الذاكرة") }
                     if (vm.messages.isNotEmpty()) {
-                        IconButton(onClick = { vm.clearChat() }) { Icon(Icons.Filled.Delete, "محادثة جديدة") }
+                        IconButton(onClick = { vm.newChat() }) { Icon(Icons.Filled.Add, "محادثة جديدة") }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -111,6 +113,16 @@ fun ChatScreen(vm: AppViewModel) {
             )
         },
         bottomBar = {
+            Column {
+            vm.notice?.let { n ->
+                Text(
+                    n,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    textAlign = TextAlign.Center,
+                )
+            }
             InputBar(
                 value = input,
                 onValueChange = { input = it },
@@ -118,6 +130,7 @@ fun ChatScreen(vm: AppViewModel) {
                 onSend = { vm.send(input); input = "" },
                 onStop = { vm.stop() },
             )
+            }
         },
     ) { padding ->
         if (vm.messages.isEmpty() && vm.error == null) {

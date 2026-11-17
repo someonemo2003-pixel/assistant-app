@@ -10,6 +10,7 @@ import java.util.Locale
 
 class SetAlarmTool : Tool {
     override val name = "set_alarm"
+    override val learnable = true
     override val title = "منبه"
     override val description = "Set an alarm on the phone's clock app. Use 24-hour time."
     override val parameters = Schema.obj(
@@ -35,6 +36,7 @@ class SetAlarmTool : Tool {
 
 class SetTimerTool : Tool {
     override val name = "set_timer"
+    override val learnable = true
     override val title = "مؤقت"
     override val description = "Start a countdown timer on the phone."
     override val parameters = Schema.obj(
@@ -56,6 +58,7 @@ class SetTimerTool : Tool {
 
 class OpenAppTool : Tool {
     override val name = "open_app"
+    override val learnable = true
     override val title = "فتح تطبيق"
     override val description =
         "Open an installed app by name (e.g. WhatsApp, YouTube, Camera, Settings). " +

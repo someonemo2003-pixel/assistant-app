@@ -56,6 +56,12 @@ class FastParserTest {
         assertEquals(Remember("عيد ميلاد أمي يوم 5 مارس"), p("افتكر إن عيد ميلاد أمي يوم 5 مارس"))
     }
 
+    @Test fun phraseKeys() {
+        assertEquals(FastParser.phraseKey("وضع النوم"), FastParser.phraseKey("وضع النوم لو سمحت"))
+        assertEquals(FastParser.phraseKey("شغّللي الفيس"), FastParser.phraseKey("شغللي الفيس!"))
+        assertEquals(listOf("7"), FastParser.numbers("صحيني ٧"))
+    }
+
     @Test fun goesToCloud() {
         assertNull(p("اكتبلي ايميل لمديري"))
         assertNull(p("صحيني 7 وافتح يوتيوب"))

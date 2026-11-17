@@ -4,6 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import com.myassistant.app.ai.ToolSpec
+import com.myassistant.app.data.ChatStore
+import com.myassistant.app.fast.ExperienceStore
 import com.myassistant.app.memory.MemoryStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +29,8 @@ interface Tool {
     val parameters: JSONObject
     /** If true, the user must approve before it runs (sending, deleting, paying...). */
     val requiresConfirmation: Boolean get() = false
+    /** If true, the fast brain may learn phrases that trigger this tool and replay them offline. */
+    val learnable: Boolean get() = false
 
     /** Human sentence shown in the approval dialog. */
     fun describe(args: JSONObject): String = title
@@ -35,7 +39,15 @@ interface Tool {
     suspend fun execute(args: JSONObject, ctx: ToolContext): String
 }
 
-class ToolContext(val app: Context, val memory: MemoryStore) {
+class ToolContext(
+    val app: Context,
+    val memory: MemoryStore,
+    val chats: ChatStore,
+    val experience: ExperienceStore,
+) {
+    /** Id of the conversation in progress (so chat search can skip it). */
+    @Volatile var currentConversation: Long? = null
+
     /** Starts an activity from anywhere; returns false if nothing on the phone can handle it. */
     suspend fun launch(intent: Intent): Boolean = withContext(Dispatchers.Main) {
         try {

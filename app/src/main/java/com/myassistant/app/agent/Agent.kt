@@ -25,6 +25,7 @@ class Agent(
     private val tools: ToolRegistry,
     private val memory: MemoryStore,
     private val toolContext: ToolContext,
+    private val learnFromAi: () -> Boolean,
 ) {
 
     private val fastBrain = FastBrain(tools, toolContext)
@@ -47,11 +48,15 @@ class Agent(
         // 2) Cloud AI for everything else.
         val system = systemPrompt(lastUser)
 
+        val actions = mutableListOf<Pair<com.myassistant.app.core.ToolCall, String>>()
         repeat(MAX_STEPS) {
             val reply = router.complete(system, trimmed(history), tools.specs())
             history += reply
             emit(reply)
-            if (reply.toolCalls.isEmpty()) return
+            if (reply.toolCalls.isEmpty()) {
+                learn(lastUser, actions, reply.text)
+                return
+            }
 
             for (call in reply.toolCalls) {
                 val tool = tools[call.name]
@@ -74,9 +79,27 @@ class Agent(
                 val msg = ChatMessage(role = Role.TOOL, text = result, toolCallId = call.id, toolName = call.name)
                 history += msg
                 emit(msg)
+                if (tool?.learnable == true) actions += call to result
             }
         }
     }
+
+    /**
+     * If the big brain handled a short request with exactly one successful action, the fast brain
+     * remembers it so the same phrase runs instantly next time.
+     */
+    private suspend fun learn(phrase: String, actions: List<Pair<com.myassistant.app.core.ToolCall, String>>, reply: String) {
+        if (!learnFromAi() || actions.size != 1 || phrase.length > 60 || reply.isBlank()) return
+        val (call, result) = actions.single()
+        if (failurePrefixes.any { result.startsWith(it) }) return
+        withContext(Dispatchers.IO) {
+            toolContext.experience.learn(phrase, call.name, call.argsJson, reply.take(200), "ai")
+        }
+    }
+
+    private val failurePrefixes = listOf(
+        "Error", "Unknown", "Missing", "Invalid", "No ", "Cannot", "App not found", "The user declined", "Could not",
+    )
 
     private suspend fun systemPrompt(userText: String): String {
         val memories = withContext(Dispatchers.IO) {
@@ -88,6 +111,8 @@ class Agent(
             appendLine("- Reply in the user's language. For Arabic, use friendly, short Egyptian Arabic.")
             appendLine("- Prefer doing things with your tools over explaining how to do them.")
             appendLine("- When the user shares a lasting fact about themselves, save it with the remember tool.")
+            appendLine("- If the user asks about something from earlier conversations, use search_chats.")
+            appendLine("- If the user teaches a shortcut (\"when I say X do Y\" / \"لما أقول X اعمل Y\"), call teach_shortcut.")
             appendLine("- Never invent tool results; report what actually happened. Keep answers concise.")
             appendLine("- Current time: $now (${TimeZone.getDefault().id}).")
             if (memories.isNotEmpty()) {

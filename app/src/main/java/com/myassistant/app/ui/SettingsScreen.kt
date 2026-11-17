@@ -69,12 +69,14 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(vm: AppViewModel) {
     val configs by vm.providerStore.configs.collectAsState()
     val keysVersion by vm.providerStore.keysVersion.collectAsState()
+    val learn by vm.settings.learnFromAi.collectAsState()
+    val autoMemory by vm.settings.autoMemory.collectAsState()
     var editing by remember { mutableStateOf<ProviderConfig?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("المزوّدين (العقل)", fontWeight = FontWeight.Bold) },
+                title = { Text("الإعدادات", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { vm.screen = Screen.Chat }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع")
@@ -88,6 +90,29 @@ fun SettingsScreen(vm: AppViewModel) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                Text("⚡ العقل السريع والتعلّم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        ToggleRow(
+                            "يتعلم من العقل الكبير",
+                            "الأوامر اللي العقل الكبير ينفّذها صح تتحفظ، والمرة الجاية تتنفّذ فوراً",
+                            learn,
+                        ) { vm.settings.setLearnFromAi(it) }
+                        ToggleRow(
+                            "يملأ الذاكرة لوحده",
+                            "لما تبدأ محادثة جديدة، يحفظ المعلومات المهمة من اللي فاتت (طلب واحد للعقل الكبير)",
+                            autoMemory,
+                        ) { vm.settings.setAutoMemory(it) }
+                        TextButton(onClick = { vm.screen = Screen.Learned }) { Text("شوف اللي اتعلمه ←") }
+                    }
+                }
+            }
+            item {
+                Text("🧠 المزوّدين (العقل الكبير)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
             item {
                 Text(
                     "المساعد بيجرّب المزوّدين بالترتيب ده. لو واحد خلص الحد المجاني أو وقع، ينقل للي بعده لوحده.",
@@ -138,6 +163,18 @@ fun SettingsScreen(vm: AppViewModel) {
             onDelete = if (!cfg.builtIn && !isNew) ({ vm.deleteProvider(cfg.id); editing = null }) else null,
             fetchModels = { c, key -> vm.fetchModels(c, key) },
         )
+    }
+}
+
+@Composable
+private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.size(8.dp))
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 
