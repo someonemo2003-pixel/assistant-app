@@ -282,6 +282,33 @@ object DeviceOwner {
     fun suspend(ctx: Context, pkg: String, on: Boolean): Boolean =
         isOwner(ctx) && runCatching { dpm(ctx).setPackagesSuspended(admin(ctx), arrayOf(pkg), on).isEmpty() }.getOrDefault(false)
 
+    // ---------- notifications of other apps ----------
+
+    fun mutedApps(ctx: Context): Set<String> = prefs(ctx).getStringSet("muted", emptySet()).orEmpty()
+
+    /**
+     * Turns an app's notifications off (or back on) without opening Settings. As device owner on Android 13+ this
+     * takes away the app's notification permission (silent, survives reboots); otherwise Nova's notification
+     * reader removes them as they arrive.
+     */
+    fun muteNotifications(ctx: Context, pkg: String, mute: Boolean): String {
+        val set = mutedApps(ctx).toMutableSet().apply { if (mute) add(pkg) else remove(pkg) }
+        prefs(ctx).edit().putStringSet("muted", set).apply()
+        var system = false
+        if (isOwner(ctx) && Build.VERSION.SDK_INT >= 33) {
+            system = runCatching {
+                dpm(ctx).setPermissionGrantState(
+                    admin(ctx), pkg, android.Manifest.permission.POST_NOTIFICATIONS,
+                    if (mute) DevicePolicyManager.PERMISSION_GRANT_STATE_DENIED else DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
+                )
+            }.getOrDefault(false)
+            if (!mute && system) runCatching {
+                dpm(ctx).setPermissionGrantState(admin(ctx), pkg, android.Manifest.permission.POST_NOTIFICATIONS, DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT)
+            }
+        }
+        return if (system) "system" else "listener"
+    }
+
     fun lockNow(ctx: Context) = runCatching { dpm(ctx).lockNow() }.isSuccess
 
     fun reboot(ctx: Context) = isOwner(ctx) && runCatching { dpm(ctx).reboot(admin(ctx)) }.isSuccess

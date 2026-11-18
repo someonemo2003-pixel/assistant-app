@@ -30,3 +30,6 @@ data class ChatMessage(
 )
 
 fun newId(): String = UUID.randomUUID().toString().replace("-", "").take(16)
+
+/** Key in [ChatMessage.raw] holding the model's own thinking text, when it shares it. */
+const val THINKING_KEY = "thinking"

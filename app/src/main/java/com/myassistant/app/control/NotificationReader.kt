@@ -42,6 +42,11 @@ class NotificationReader : NotificationListenerService() {
 
     private fun handle(sbn: StatusBarNotification, alert: Boolean) {
         if (sbn.packageName == packageName) return
+        // muted by the user → remove it right away (backup for when the system-level switch isn't available)
+        if (alert && sbn.packageName in com.myassistant.app.admin.DeviceOwner.mutedApps(this)) {
+            runCatching { cancelNotification(sbn.key) }
+            return
+        }
         val n = sbn.notification ?: return
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras ?: return

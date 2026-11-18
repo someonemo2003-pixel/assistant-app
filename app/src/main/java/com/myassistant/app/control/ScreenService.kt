@@ -332,7 +332,9 @@ class ScreenService : AccessibilityService() {
         val text = node.text?.toString()?.trim().orEmpty()
         val desc = node.contentDescription?.toString()?.trim().orEmpty()
         val hint = if (Build.VERSION.SDK_INT >= 26) node.hintText?.toString()?.trim().orEmpty() else ""
-        val label = listOf(text, desc, hint).firstOrNull { it.isNotEmpty() }.orEmpty()
+        var label = listOf(text, desc, hint).firstOrNull { it.isNotEmpty() }.orEmpty()
+        // Switches/checkboxes often have no text of their own: name them after the row they sit in.
+        if (label.isEmpty() && node.isCheckable) label = rowLabel(node)?.let { "$it [switch]" } ?: "[switch]"
         val interesting = label.isNotEmpty() || node.isClickable || node.isEditable || node.isScrollable || node.isCheckable
         if (interesting && (label.isNotEmpty() || node.isEditable || node.isScrollable)) {
             out += node
@@ -349,6 +351,26 @@ class ScreenService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { collect(it, out, lines, depth + 1, max) }
         }
+    }
+
+    /** The first text in the row around a node (up to 3 levels up), e.g. the title next to a switch. */
+    private fun rowLabel(n: AccessibilityNodeInfo): String? {
+        var p = n.parent
+        var hops = 0
+        while (p != null && hops < 3) {
+            firstText(p, n, 0)?.let { return it }
+            p = p.parent
+            hops++
+        }
+        return null
+    }
+
+    private fun firstText(node: AccessibilityNodeInfo, skip: AccessibilityNodeInfo, depth: Int): String? {
+        if (depth > 4 || node == skip) return null
+        val t = (node.text ?: node.contentDescription)?.toString()?.trim()
+        if (!t.isNullOrEmpty()) return t.take(50)
+        for (i in 0 until node.childCount) node.getChild(i)?.let { c -> firstText(c, skip, depth + 1)?.let { return it } }
+        return null
     }
 
     private fun parentClickable(n: AccessibilityNodeInfo): Boolean {

@@ -44,6 +44,28 @@ class AppSettings(context: Context) {
     val actionBrain: StateFlow<String> = _actionBrain.asStateFlow()
     fun setActionBrain(id: String) { prefs.edit().putString(ACTION_BRAIN, id).apply(); _actionBrain.value = id }
 
+    /** Picked from the model menu for the current chat only (not saved; cleared on a new chat). Empty = use the default. */
+    val sessionChat = MutableStateFlow("")
+    val sessionAction = MutableStateFlow("")
+
+    private val _opencodeModel = MutableStateFlow(prefs.getString(OC_MODEL, "") ?: "")
+    /** Model OpenCode uses ("provider/model"; "" = OpenCode's own default). */
+    val opencodeModel: StateFlow<String> = _opencodeModel.asStateFlow()
+    fun setOpencodeModel(id: String) { prefs.edit().putString(OC_MODEL, id).apply(); _opencodeModel.value = id }
+    val sessionOpencode = MutableStateFlow("")
+    fun effectiveOpencode(): String = sessionOpencode.value.ifEmpty { _opencodeModel.value }
+
+    private val _opencodeModels = MutableStateFlow(
+        (prefs.getString(OC_MODELS, "") ?: "").split('\n').filter { it.isNotBlank() },
+    )
+    /** Models OpenCode on the phone can use (last fetched list). */
+    val opencodeModels: StateFlow<List<String>> = _opencodeModels.asStateFlow()
+    fun setOpencodeModels(list: List<String>) { prefs.edit().putString(OC_MODELS, list.joinToString("\n")).apply(); _opencodeModels.value = list }
+
+    /** What actually answers / runs phone actions right now. */
+    fun effectiveChat(): String = sessionChat.value.ifEmpty { _chatBrain.value }
+    fun effectiveAction(): String = sessionAction.value.ifEmpty { _actionBrain.value }
+
     private val _confirmSends = MutableStateFlow(prefs.getBoolean(CONFIRM_SENDS, false))
     /** Ask before sending messages/emails/SMS and calling. Off = just do it. */
     val confirmSends: StateFlow<Boolean> = _confirmSends.asStateFlow()
@@ -68,5 +90,7 @@ class AppSettings(context: Context) {
         const val CHAT_BRAIN = "chat_brain"
         const val CONFIRM_SENDS = "confirm_sends"
         const val ACTION_BRAIN = "action_brain"
+        const val OC_MODEL = "opencode_model"
+        const val OC_MODELS = "opencode_models"
     }
 }

@@ -145,6 +145,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         messages += userMsg
         job = viewModelScope.launch {
             busy = true
+            com.myassistant.app.agent.AgentStatus.start()
             try {
                 val convId = currentConversation ?: withContext(Dispatchers.IO) { graph.chats.newConversation(t) }
                     .also { currentConversation = it }
@@ -161,6 +162,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 error = e.message ?: "حصل خطأ"
             } finally {
                 busy = false
+                com.myassistant.app.agent.AgentStatus.done()
                 confirmRequest = null
                 graph.indexSoon()
                 if (spoken && voiceMode) afterVoiceTurn(startIndex)
@@ -179,12 +181,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Starts a fresh chat (the old one stays saved in the chat list). */
     fun newChat() {
+        settings.sessionChat.value = ""
+        settings.sessionAction.value = ""
+        settings.sessionOpencode.value = ""
         stop()
         finishCurrent()
         messages.clear()
         error = null
         currentConversation = null
         graph.toolContext.currentConversation = null
+    }
+
+    /** True while the OpenCode model list is being read from Termux. */
+    var opencodeLoading by mutableStateOf(false)
+        private set
+    var opencodeError by mutableStateOf<String?>(null)
+        private set
+
+    fun refreshOpencodeModels() {
+        if (opencodeLoading) return
+        opencodeLoading = true
+        opencodeError = null
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val list = runCatching { com.myassistant.app.terminal.OpenCode.models(app) }.getOrDefault(emptyList())
+            if (list.isEmpty()) opencodeError = "مقدرتش أجيب الموديلات. اتأكد إن OpenCode متجهّز في Termux."
+            else settings.setOpencodeModels(list)
+            opencodeLoading = false
+        }
     }
 
     fun openConversation(id: Long) {

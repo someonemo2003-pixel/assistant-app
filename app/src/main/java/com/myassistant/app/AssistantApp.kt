@@ -105,7 +105,8 @@ class AppGraph(context: Context) {
         ReadScreenTool(), DoStepsTool(), TapTool(), TypeTextTool(), ScrollTool(), PhoneButtonTool(), RunRecipeTool(),
         // phone data
         com.myassistant.app.admin.BlockAppTool(), com.myassistant.app.admin.ListBlockedTool(),
-        com.myassistant.app.admin.SuspendAppTool(), com.myassistant.app.admin.LockPhoneTool(),
+        com.myassistant.app.admin.SuspendAppTool(), com.myassistant.app.admin.LockPhoneTool(), com.myassistant.app.admin.MuteNotificationsTool(),
+        com.myassistant.app.terminal.TerminalTool(), com.myassistant.app.terminal.OpenCodePlanTool(), com.myassistant.app.terminal.OpenCodeDoTool(), com.myassistant.app.terminal.OpenCodeModelsTool(),
         com.myassistant.app.settings.AppStatusTool(), com.myassistant.app.settings.ChangeSettingTool(),
         com.myassistant.app.settings.CheckUpdateTool(), com.myassistant.app.settings.OpenSetupTool(),
         com.myassistant.app.teacher.TeacherReportTool(),

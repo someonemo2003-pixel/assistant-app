@@ -58,3 +58,25 @@ class LockPhoneTool : Tool {
     override suspend fun execute(args: JSONObject, ctx: ToolContext) =
         if (DeviceOwner.lockNow(ctx.app)) "🔒 Locked" else "Can't lock — device owner is OFF"
 }
+
+class MuteNotificationsTool : Tool {
+    override val name = "mute_notifications"
+    override val title = "إشعارات برنامج"
+    override val description =
+        "Turn an app's notifications off or back on, in the background (no need to open Settings or the screen). " +
+            "Use this instead of screen control for 'stop notifications from X'."
+    override val parameters = Schema.obj(
+        "app" to Schema.string("App name or package"),
+        "on" to Schema.string("'false' to mute (default), 'true' to allow again"),
+        required = listOf("app"),
+    )
+    override val learnable = true
+
+    override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
+        val app = DeviceOwner.findInstalled(ctx.app, args.str("app")) ?: return "App not found"
+        val allow = args.str("on") == "true"
+        val how = DeviceOwner.muteNotifications(ctx.app, app.second, mute = !allow)
+        return (if (allow) "Notifications of ${app.first} are back on" else "Muted notifications of ${app.first}") +
+            if (how == "system") " (system level)" else " (Nova removes them as they arrive)"
+    }
+}

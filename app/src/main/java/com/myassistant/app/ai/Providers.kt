@@ -219,18 +219,22 @@ class ProviderRouter(private val providers: () -> List<Pair<String, LlmProvider>
         history: List<ChatMessage>,
         tools: List<ToolSpec>,
         preferred: String? = null,
+        onAttempt: (name: String, previousFailed: String?) -> Unit = { _, _ -> },
     ): ChatMessage {
         val all = providers()
         val list = (all.filter { it.first == preferred } + all.filterNot { it.first == preferred }).map { it.second }
         if (list.isEmpty()) throw NoProvidersException()
         val errors = mutableListOf<String>()
+        var failed: String? = null
         for (p in list) {
             try {
+                onAttempt(p.name, failed)
                 return p.complete(system, history, tools).copy(providerName = p.name)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 errors += "• ${p.name}: ${e.message}"
+                failed = p.name
             }
         }
         throw AllProvidersFailedException(errors)

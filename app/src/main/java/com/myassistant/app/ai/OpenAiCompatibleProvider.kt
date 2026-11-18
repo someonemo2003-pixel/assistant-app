@@ -74,7 +74,13 @@ class OpenAiCompatibleProvider(
         val choices = res.optJSONArray("choices")
         if (choices == null || choices.length() == 0) throw ProviderException("رد فارغ")
         val msg = choices.getJSONObject(0).getJSONObject("message")
-        val text = if (msg.isNull("content")) "" else msg.optString("content")
+        var text = if (msg.isNull("content")) "" else msg.optString("content")
+        // Reasoning models send their thinking separately (or inside <think> tags).
+        var thinking = msg.optString("reasoning_content").ifBlank { msg.optString("reasoning") }.takeIf { it != "null" }.orEmpty()
+        Regex("(?s)<think>(.*?)</think>").find(text)?.let { m ->
+            thinking = (thinking + "\n" + m.groupValues[1]).trim()
+            text = text.removeRange(m.range)
+        }
 
         val calls = mutableListOf<ToolCall>()
         msg.optJSONArray("tool_calls")?.let { arr ->
@@ -89,7 +95,10 @@ class OpenAiCompatibleProvider(
                 calls += ToolCall(c.optString("id").ifBlank { newId() }, fn.optString("name"), args)
             }
         }
-        return ChatMessage(role = Role.ASSISTANT, text = text.trim(), toolCalls = calls)
+        return ChatMessage(
+            role = Role.ASSISTANT, text = text.trim(), toolCalls = calls,
+            raw = if (thinking.isNotBlank()) mapOf(THINKING_KEY to thinking.take(6000)) else emptyMap(),
+        )
     }
 
     override suspend fun listModels(): List<String> {

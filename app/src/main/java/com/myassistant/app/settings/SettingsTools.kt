@@ -37,6 +37,7 @@ class AppStatusTool : Tool {
             appendLine("version: ${Updater.current(ctx.app)}, auto_update: ${Updater.autoOn(ctx.app)}")
             appendLine("providers (tried in this order):\n$prov")
             appendLine("chat_brain: ${brain(s.chatBrain.value)}, action_brain: ${brain(s.actionBrain.value)}")
+            appendLine("opencode_model: ${s.opencodeModel.value.ifEmpty { "OpenCode default" }}")
             appendLine("speak_replies: ${s.speakReplies.value}, hands_free: ${s.handsFree.value}")
             appendLine("learn_from_ai: ${s.learnFromAi.value}, auto_memory: ${s.autoMemory.value}")
             appendLine("daily_report: ${DailyReport.enabled(ctx.app)} at " + String.format(Locale.US, "%02d:%02d", DailyReport.hour(ctx.app), DailyReport.minute(ctx.app)))
@@ -53,7 +54,7 @@ class ChangeSettingTool : Tool {
         "Change one of Nova's settings. name: speak_replies | hands_free | learn_from_ai | auto_memory | auto_update (value on/off); " +
             "daily_report (on/off) | report_time (HH:mm); chat_brain | action_brain (provider name, or 'default'); " +
             "provider_on | provider_off (provider name); provider_model (value 'ProviderName=model-id'); " +
-            "meaning_model (download/delete)."
+            "meaning_model (download/delete); opencode_model (provider/model from opencode_models, or default)."
     override val parameters = Schema.obj(
         "name" to Schema.string("Setting name"),
         "value" to Schema.string("New value"),
@@ -69,6 +70,14 @@ class ChangeSettingTool : Tool {
         fun provider(n: String) = g.providers.configs.value.firstOrNull { it.name.equals(n.trim(), true) || it.id.equals(n.trim(), true) }
             ?: g.providers.configs.value.firstOrNull { it.name.contains(n.trim(), true) }
         return when (name) {
+            "opencode_model" -> {
+                val id = if (v.isBlank() || v.equals("default", true)) "" else
+                    s.opencodeModels.value.firstOrNull { it.equals(v, true) }
+                        ?: s.opencodeModels.value.firstOrNull { it.contains(v, true) }
+                        ?: v.takeIf { Regex("^[A-Za-z0-9._/:-]+/[A-Za-z0-9._/:-]+$").matches(it) }
+                        ?: return "Unknown OpenCode model \"$v\". Call opencode_models to see the list."
+                s.setOpencodeModel(id); "OK: OpenCode model = ${id.ifEmpty { "OpenCode default" }}"
+            }
             "speak_replies" -> { s.setSpeakReplies(on); "OK" }
             "hands_free" -> { s.setHandsFree(on); "OK" }
             "learn_from_ai" -> { s.setLearnFromAi(on); "OK" }

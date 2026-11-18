@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -115,6 +116,8 @@ fun ChatScreen(vm: AppViewModel) {
     LaunchedEffect(vm.messages.size, vm.busy, vm.error) { listState.animateScrollToItem(0) }
 
     var menuOpen by remember { mutableStateOf(false) }
+    var pickerOpen by remember { mutableStateOf(false) }
+    if (pickerOpen) ModelPicker(vm, configs.filter { it.enabled && vm.providerStore.hasKey(it.id) }) { pickerOpen = false }
 
     Box(Modifier.fillMaxSize()) {
     NovaBackground()
@@ -123,14 +126,24 @@ fun ChatScreen(vm: AppViewModel) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Nova", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
-                        Spacer(Modifier.size(8.dp))
-                        // green = ready, red = needs an API key
-                        Box(
-                            Modifier.size(7.dp).clip(CircleShape)
-                                .background(if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error),
-                        )
+                    // Tap the name to choose which model answers (like a model switcher).
+                    val sChat by vm.settings.sessionChat.collectAsState()
+                    val dChat by vm.settings.chatBrain.collectAsState()
+                    val current = configs.firstOrNull { it.id == sChat.ifEmpty { dChat } }?.name ?: "تلقائي"
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { pickerOpen = true }.padding(horizontal = 10.dp, vertical = 2.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Nova", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
+                            Spacer(Modifier.size(8.dp))
+                            // green = ready, red = needs an API key
+                            Box(
+                                Modifier.size(7.dp).clip(CircleShape)
+                                    .background(if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error),
+                            )
+                        }
+                        Text("$current ▾", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
@@ -200,12 +213,27 @@ fun ChatScreen(vm: AppViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 vm.error?.let { err -> item(key = "error") { ErrorCard(err) } }
-                if (vm.busy) item(key = "typing") { TypingIndicator() }
-                items(visible, key = { it.id }) { msg ->
+                if (vm.busy) item(key = "typing") { WorkingLine() }
+                // Steps the assistant ran are folded into one small line per task (tap to see them).
+                val rows = buildList<List<com.myassistant.app.core.ChatMessage>> {
+                    for (m in visible) {
+                        val lastGroup = lastOrNull()
+                        if (m.role == Role.TOOL && lastGroup != null && lastGroup.first().role == Role.TOOL) {
+                            set(size - 1, lastGroup + m)
+                        } else {
+                            add(listOf(m))
+                        }
+                    }
+                }
+                items(rows, key = { it.first().id }) { group ->
+                    val msg = group.first()
                     when (msg.role) {
                         Role.USER -> Bubble(msg.text, mine = true)
-                        Role.ASSISTANT -> Bubble(msg.text, mine = false, footer = msg.providerName)
-                        Role.TOOL -> ToolChip(vm.tools[msg.toolName.orEmpty()]?.title ?: msg.toolName.orEmpty(), msg.text)
+                        Role.ASSISTANT -> Bubble(msg.text, mine = false, footer = msg.providerName, thinking = msg.raw[com.myassistant.app.core.THINKING_KEY])
+                        Role.TOOL -> StepsChip(
+                            id = msg.id,
+                            steps = group.asReversed().map { (vm.tools[it.toolName.orEmpty()]?.title ?: it.toolName.orEmpty()) to it.text },
+                        )
                     }
                 }
             }
@@ -215,7 +243,8 @@ fun ChatScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun Bubble(text: String, mine: Boolean, footer: String? = null) {
+private fun Bubble(text: String, mine: Boolean, footer: String? = null, thinking: String? = null) {
+    var showThinking by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         val shape = RoundedCornerShape(
             topStart = 22.dp, topEnd = 22.dp,
@@ -232,6 +261,22 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null) {
             SelectionContainer {
                 Text(text, style = MaterialTheme.typography.bodyLarge, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface)
             }
+            if (!thinking.isNullOrBlank()) {
+                Text(
+                    if (showThinking) "إخفاء التفكير" else "شوف تفكيره",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NovaCyan.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(top = 6.dp).clickable { showThinking = !showThinking },
+                )
+                if (showThinking) {
+                    Text(
+                        thinking.trim(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             if (footer != null) {
                 Text(
                     footer,
@@ -244,30 +289,43 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null) {
     }
 }
 
+private val failMarks = listOf("Error", "Unknown tool", "Permission not granted", "The user declined", "Could not", "Cannot", "فشل")
+
+/** One quiet line for the steps behind an answer: "8 خطوات ✓" — tap to see each step. */
 @Composable
-private fun ToolChip(title: String, result: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(NovaCyan.copy(alpha = 0.08f))
-                .border(1.dp, NovaCyan.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
-                .widthIn(max = 320.dp),
-        ) {
-            Icon(
-                Icons.Filled.Build, null,
-                tint = NovaCyan,
-                modifier = Modifier.size(14.dp),
+private fun StepsChip(id: String, steps: List<Pair<String, String>>) {
+    var open by rememberSaveable(id) { mutableStateOf(false) }
+    val failed = steps.count { (_, r) -> failMarks.any { r.trimStart().startsWith(it) } }
+    val label = when {
+        steps.size == 1 -> steps.first().first
+        else -> "${steps.size} خطوات"
+    } + if (failed > 0) " · $failed مكملتش" else ""
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { open = !open }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(6.dp).clip(CircleShape)
+                    .background(if (failed > 0) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NovaCyan.copy(alpha = 0.7f)),
             )
-            Spacer(Modifier.size(6.dp))
-            Text(
-                "$title · $result",
-                style = MaterialTheme.typography.labelMedium,
-                color = NovaCyan.copy(alpha = 0.85f),
-                maxLines = 3,
-            )
+            Spacer(Modifier.size(8.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (open) {
+            steps.forEach { (title, result) ->
+                Text(
+                    "• $title: " + result.lineSequence().firstOrNull().orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 14.dp, top = 4.dp),
+                )
+            }
         }
     }
 }
@@ -284,6 +342,42 @@ private fun ErrorCard(text: String) {
         Icon(Icons.Filled.Warning, null, tint = MaterialTheme.colorScheme.onErrorContainer)
         Spacer(Modifier.size(8.dp))
         Text(text, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** While Nova works: what it's doing right now, how long it's been, and its latest thought (if the model shares it). */
+@Composable
+private fun WorkingLine() {
+    val now by com.myassistant.app.agent.AgentStatus.now.collectAsState()
+    val thought by com.myassistant.app.agent.AgentStatus.thought.collectAsState()
+    var seconds by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            seconds = (System.currentTimeMillis() - com.myassistant.app.agent.AgentStatus.startedAt) / 1000
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TypingIndicator()
+            Spacer(Modifier.size(10.dp))
+            Text(
+                (now ?: "بيفكّر…") + if (seconds >= 3) "  ${seconds}ث" else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+        }
+        thought?.let {
+            Text(
+                it.lines().filter { l -> l.isNotBlank() }.takeLast(3).joinToString("\n"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                maxLines = 3,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp, top = 6.dp),
+            )
+        }
     }
 }
 
@@ -486,6 +580,129 @@ private fun EmptyState(
         if (needsKey) {
             Spacer(Modifier.height(28.dp))
             androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API من الإعدادات", color = NovaCyan) }
+        }
+    }
+}
+
+
+/**
+ * Model menu: who answers (chat) and who runs phone actions. By default a pick applies to this chat only;
+ * "خليه الافتراضي" saves it for every chat.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelPicker(vm: AppViewModel, providers: List<com.myassistant.app.ai.ProviderConfig>, onDismiss: () -> Unit) {
+    val s = vm.settings
+    val sChat by s.sessionChat.collectAsState()
+    val sAction by s.sessionAction.collectAsState()
+    val dChat by s.chatBrain.collectAsState()
+    val dAction by s.actionBrain.collectAsState()
+    var asDefault by remember { mutableStateOf(false) }
+
+    fun pick(chat: Boolean, id: String) {
+        if (asDefault) {
+            if (chat) { s.setChatBrain(id); s.sessionChat.value = "" } else { s.setActionBrain(id); s.sessionAction.value = "" }
+        } else {
+            if (chat) s.sessionChat.value = id else s.sessionAction.value = id
+        }
+    }
+
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF0E0C2B)) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+            ModelSection("يرد عليا", providers, sChat, dChat) { pick(true, it) }
+            ModelSection("ينفّذ الأوامر على الموبايل", providers, sAction, dAction) { pick(false, it) }
+            OpenCodeSection(vm, asDefault)
+            Row(
+                Modifier.fillMaxWidth().padding(top = 14.dp).clickable { asDefault = !asDefault },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.Checkbox(checked = asDefault, onCheckedChange = { asDefault = it })
+                Text("خلّي اختياري الافتراضي لكل المحادثات", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (providers.isEmpty()) Text("مفيش مزوّدين جاهزين. قول لـ Nova: عايز أضيف مزوّد.", color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** OpenCode's models (the coding agent in Termux): pick one for this chat or as the default. */
+@Composable
+private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
+    val s = vm.settings
+    val models by s.opencodeModels.collectAsState()
+    val session by s.sessionOpencode.collectAsState()
+    val default by s.opencodeModel.collectAsState()
+    var query by remember { mutableStateOf("") }
+    val current = session.ifEmpty { default }
+    fun pick(id: String) { if (asDefault) { s.setOpencodeModel(id); s.sessionOpencode.value = "" } else s.sessionOpencode.value = id }
+
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("OpenCode (البرمجة)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f))
+        Text(
+            if (vm.opencodeLoading) "بيحمّل…" else "تحديث",
+            style = MaterialTheme.typography.labelMedium, color = NovaCyan,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.refreshOpencodeModels() }.padding(6.dp),
+        )
+    }
+    vm.opencodeError?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+    if (models.isEmpty()) {
+        Text("دوس تحديث علشان أجيب موديلات OpenCode من Termux.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    if (models.size > 8) {
+        androidx.compose.material3.OutlinedTextField(
+            value = query, onValueChange = { query = it }, singleLine = true,
+            placeholder = { Text("دوّر على موديل") }, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        )
+    }
+    val shown = (listOf("") + models).filter { query.isBlank() || it.contains(query.trim(), true) }
+        .sortedByDescending { it == current }.take(30)
+    shown.forEach { id ->
+        val on = id == current
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(if (on) NovaViolet.copy(alpha = 0.18f) else Color.Transparent)
+                .clickable { pick(id) }
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(if (id.isEmpty()) "اللي OpenCode مختاره" else id.substringAfter('/'), style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                if (id.isNotEmpty()) Text(id.substringBefore('/'), style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+            if (id == default) Text("الافتراضي", style = MaterialTheme.typography.labelSmall, color = NovaCyan)
+            if (on) { Spacer(Modifier.size(8.dp)); Text("✓", color = NovaCyan) }
+        }
+    }
+}
+
+@Composable
+private fun ModelSection(
+    title: String,
+    providers: List<com.myassistant.app.ai.ProviderConfig>,
+    selected: String,
+    default: String,
+    onPick: (String) -> Unit,
+) {
+    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+    providers.forEach { c ->
+        val on = (selected.ifEmpty { default }) == c.id
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(if (on) NovaViolet.copy(alpha = 0.18f) else Color.Transparent)
+                .clickable { onPick(c.id) }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(c.name, style = MaterialTheme.typography.bodyLarge)
+                Text(c.model, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+            if (c.id == default) Text("الافتراضي", style = MaterialTheme.typography.labelSmall, color = NovaCyan)
+            if (on) { Spacer(Modifier.size(8.dp)); Text("✓", color = NovaCyan) }
         }
     }
 }
