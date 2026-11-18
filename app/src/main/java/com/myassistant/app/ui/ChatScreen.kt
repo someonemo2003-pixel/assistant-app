@@ -68,6 +68,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -127,11 +130,19 @@ fun ChatScreen(vm: AppViewModel) {
     var pickerOpen by remember { mutableStateOf(false) }
     if (pickerOpen) ModelPicker(vm, configs.filter { it.enabled && vm.providerStore.hasKey(it.id) }) { pickerOpen = false }
 
+    val haze = remember { dev.chrisbanes.haze.HazeState() }
+    val glass = dev.chrisbanes.haze.HazeStyle(
+        backgroundColor = MaterialTheme.colorScheme.background,
+        tint = dev.chrisbanes.haze.HazeTint(MaterialTheme.colorScheme.background.copy(alpha = 0.55f)),
+        blurRadius = 24.dp,
+        noiseFactor = 0.04f,
+    )
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
+                modifier = Modifier.hazeEffect(state = haze, style = glass),
                 title = {
                     // Tap the name to choose which model answers (like a model switcher).
                     val sChat by vm.settings.sessionChat.collectAsState()
@@ -185,7 +196,7 @@ fun ChatScreen(vm: AppViewModel) {
             )
         },
         bottomBar = {
-            Column {
+            Column(Modifier.hazeEffect(state = haze, style = glass)) {
             vm.notice?.let { n ->
                 Text(
                     n,
@@ -229,8 +240,13 @@ fun ChatScreen(vm: AppViewModel) {
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                // Messages scroll under the glass bars.
+                modifier = Modifier.fillMaxSize().hazeSource(haze),
+                contentPadding = PaddingValues(
+                    start = 16.dp, end = 16.dp,
+                    top = padding.calculateTopPadding() + 14.dp,
+                    bottom = padding.calculateBottomPadding() + 14.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 vm.error?.let { err -> item(key = "error") { ErrorCard(err) } }
@@ -248,6 +264,13 @@ fun ChatScreen(vm: AppViewModel) {
                 }
                 items(rows, key = { it.first().id }) { group ->
                     val msg = group.first()
+                    Box(Modifier.fillMaxWidth().animateItem(
+                        fadeInSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                        placementSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = 0.72f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                            visibilityThreshold = androidx.compose.ui.unit.IntOffset.VisibilityThreshold,
+                        ),
+                    )) {
                     when (msg.role) {
                         Role.USER -> Bubble(msg.text, mine = true)
                         Role.ASSISTANT -> Bubble(msg.text, mine = false, footer = msg.providerName, thinking = msg.raw[com.myassistant.app.core.THINKING_KEY])
@@ -255,6 +278,7 @@ fun ChatScreen(vm: AppViewModel) {
                             id = msg.id,
                             steps = group.asReversed().map { (vm.tools[it.toolName.orEmpty()]?.title ?: it.toolName.orEmpty()) to it.text },
                         )
+                    }
                     }
                 }
             }
@@ -404,35 +428,21 @@ private fun WorkingLine() {
 
 @Composable
 private fun TypingIndicator() {
-    val transition = rememberInfiniteTransition(label = "typing")
-    val halo by transition.animateFloat(
-        initialValue = 0.06f,
-        targetValue = 0.18f,
-        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
-        label = "thinkingGlow",
+    val comp by com.airbnb.lottie.compose.rememberLottieComposition(
+        com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(com.myassistant.app.R.raw.nova_thinking),
     )
-    Row(
+    Box(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f + halo * 0.20f))
-            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = halo), RoundedCornerShape(20.dp))
-            .padding(horizontal = 15.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        repeat(3) { i ->
-            val a by transition.animateFloat(
-                initialValue = 0.25f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(500, delayMillis = i * 150), RepeatMode.Reverse),
-                label = "dot$i",
-            )
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .alpha(a)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-        }
+        com.airbnb.lottie.compose.LottieAnimation(
+            composition = comp,
+            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+            modifier = Modifier.size(width = 54.dp, height = 18.dp),
+        )
     }
 }
 
