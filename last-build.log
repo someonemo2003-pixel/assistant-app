@@ -1,0 +1,121 @@
+status: success
+63:    cos=0.9996  task: sentence similarity | query: صحيني
+64:    cos=0.9996  task: sentence similarity | query: عايز 
+65:    cos=0.9997  task: sentence similarity | query: اظبطل
+66:    cos=0.9997  task: sentence similarity | query: افتح 
+67:    cos=0.9996  task: sentence similarity | query: شغللي
+68:    cos=0.9998  task: sentence similarity | query: وضع ا
+69:    cos=0.9997  title: none | text: حجزت عند دكتور الأسن
+70:    cos=0.9997  title: none | text: عيد ميلاد أمي يوم 5 
+71:    cos=0.9995  Hello World, how are you?
+72:    cos=0.9996  مرحبا 😀 يا جماعة!!
+73:    cos=0.9996  الإيميل بتاع شركة X عن عرض السعر 1500 جن
+74:    cos=0.9993  ﷺ ﻻ ٱلرَّحْمَٰن
+75:    cos=0.9994     مسافات   كتير  
+76:    cos=0.9992  a	b
+78:    cos=0.9994  صحّيني
+79:    cos=0.9993  OpenRouter وGroq وGemini
+80:    avg ms: 182
+81:    alarm-vs-alarm=0.78726226 alarm-vs-youtube=0.55357856
+84:    tokenizer: 16/16 identical
+-----
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:generateReleaseResValues FROM-CACHE
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources FROM-CACHE
+> Task :app:mergeReleaseResources FROM-CACHE
+> Task :app:packageReleaseResources FROM-CACHE
+> Task :app:parseReleaseLocalResources FROM-CACHE
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease FROM-CACHE
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:javaPreCompileRelease FROM-CACHE
+> Task :app:preReleaseUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileReleaseUnitTest FROM-CACHE
+> Task :app:extractProguardFiles
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseNativeLibs
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseArtProfile
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libonnxruntime.so, libonnxruntime4j_jni.so.
+
+> Task :app:mergeReleaseShaders
+> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets FROM-CACHE
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:processReleaseResources
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:convertLinkedResourcesToProtoRelease
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:compileReleaseKotlin
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:processReleaseJavaRes
+> Task :app:bundleReleaseClassesToCompileJar
+> Task :app:bundleReleaseClassesToRuntimeJar
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:compileReleaseUnitTestKotlin
+> Task :app:compileReleaseUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processReleaseUnitTestJavaRes
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:mergeReleaseJavaResource
+
+> Task :app:testReleaseUnitTest
+
+GemmaModelTest > embeddingsMatchReference STANDARD_OUT
+    cos=0.9996  task: sentence similarity | query: صحيني
+    cos=0.9996  task: sentence similarity | query: عايز 
+    cos=0.9997  task: sentence similarity | query: اظبطل
+    cos=0.9997  task: sentence similarity | query: افتح 
+    cos=0.9996  task: sentence similarity | query: شغللي
+    cos=0.9998  task: sentence similarity | query: وضع ا
+    cos=0.9997  title: none | text: حجزت عند دكتور الأسن
+    cos=0.9997  title: none | text: عيد ميلاد أمي يوم 5 
+    cos=0.9995  Hello World, how are you?
+    cos=0.9996  مرحبا 😀 يا جماعة!!
+    cos=0.9996  الإيميل بتاع شركة X عن عرض السعر 1500 جن
+    cos=0.9993  ﷺ ﻻ ٱلرَّحْمَٰن
+    cos=0.9994     مسافات   كتير  
+    cos=0.9992  a	b
+    c
+    cos=0.9994  صحّيني
+    cos=0.9993  OpenRouter وGroq وGemini
+    avg ms: 182
+    alarm-vs-alarm=0.78726226 alarm-vs-youtube=0.55357856
+
+GemmaModelTest > tokenizerMatchesHuggingFace STANDARD_OUT
+    tokenizer: 16/16 identical
+
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:minifyReleaseWithR8
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:shrinkReleaseRes
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1795022042257.json
+
+BUILD SUCCESSFUL in 3m 19s
+55 actionable tasks: 45 executed, 10 from cache
