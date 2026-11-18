@@ -557,9 +557,9 @@ fun NovaRing(size: androidx.compose.ui.unit.Dp, active: Boolean, level: Float = 
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val unit = size.minDimension
+            val cx = this.size.width / 2f
+            val cy = this.size.height / 2f
+            val unit = this.size.minDimension
             val radius = unit * 0.265f
             val radians = Math.PI.toFloat() / 180f
 
