@@ -34,12 +34,12 @@ class AppSettings(context: Context) {
     val handsFree: StateFlow<Boolean> = _handsFree.asStateFlow()
     fun setHandsFree(on: Boolean) { prefs.edit().putBoolean(HANDS_FREE, on).apply(); _handsFree.value = on }
 
-    private val _chatBrain = MutableStateFlow(prefs.getString(CHAT_BRAIN, "gemini") ?: "")
+    private val _chatBrain = MutableStateFlow(prefs.getString(CHAT_BRAIN, "nvidia-kimi") ?: "")
     /** Provider id used first for conversation ("" = normal order). */
     val chatBrain: StateFlow<String> = _chatBrain.asStateFlow()
     fun setChatBrain(id: String) { prefs.edit().putString(CHAT_BRAIN, id).apply(); _chatBrain.value = id }
 
-    private val _actionBrain = MutableStateFlow(prefs.getString(ACTION_BRAIN, "") ?: "")
+    private val _actionBrain = MutableStateFlow(prefs.getString(ACTION_BRAIN, "groq") ?: "")
     /** Provider id used first while operating the phone screen ("" = normal order). */
     val actionBrain: StateFlow<String> = _actionBrain.asStateFlow()
     fun setActionBrain(id: String) { prefs.edit().putString(ACTION_BRAIN, id).apply(); _actionBrain.value = id }

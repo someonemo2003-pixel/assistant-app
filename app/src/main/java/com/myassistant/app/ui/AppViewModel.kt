@@ -43,6 +43,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var screen by mutableStateOf(Screen.Chat)
 
+    /** Which setup panel the Settings screen shows: providers | gmail | backup. */
+    var setupSection by mutableStateOf("providers")
+
+    init {
+        viewModelScope.launch {
+            UiRequests.open.collect { s ->
+                if (s == null) return@collect
+                when (s) {
+                    "permissions" -> screen = Screen.Permissions
+                    "learned" -> screen = Screen.Learned
+                    "chats" -> screen = Screen.Chats
+                    "data" -> screen = Screen.Memory
+                    else -> { setupSection = s; screen = Screen.Settings }
+                }
+                UiRequests.consume()
+            }
+        }
+    }
+
     val memories = mutableStateListOf<MemoryItem>()
     val conversations = mutableStateListOf<Conversation>()
     val experiences = mutableStateListOf<Experience>()

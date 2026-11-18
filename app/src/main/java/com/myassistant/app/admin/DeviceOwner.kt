@@ -225,6 +225,7 @@ object DeviceOwner {
             ContextCompat.getMainExecutor(ctx).execute {
                 Toast.makeText(ctx, "🚫 مسموح بس Chrome وEdge ومتصفح الموبايل — اتشال", Toast.LENGTH_LONG).show()
             }
+            runCatching { com.myassistant.app.reading.Reading.offerInstead(ctx) }
             return
         }
         val pm = ctx.packageManager
@@ -234,6 +235,7 @@ object DeviceOwner {
         if (hit.pkg == null) save(ctx, list - hit + hit.copy(pkg = pkg)) // learn the package for next time
         remove(ctx, pkg)
         ContextCompat.getMainExecutor(ctx).execute { Toast.makeText(ctx, "🚫 ${hit.name} ممنوع — اتشال", Toast.LENGTH_LONG).show() }
+        runCatching { com.myassistant.app.reading.Reading.offerInstead(ctx) }
     }
 
     /** Listens for installs while the app's services are running. */

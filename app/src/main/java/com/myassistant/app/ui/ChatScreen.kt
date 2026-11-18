@@ -133,11 +133,6 @@ fun ChatScreen(vm: AppViewModel) {
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = { vm.screen = Screen.Settings }) {
-                        Icon(Icons.Filled.Settings, "الإعدادات", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
                 actions = {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
@@ -194,7 +189,7 @@ fun ChatScreen(vm: AppViewModel) {
                 modifier = Modifier.padding(padding),
                 active = listen.listening || speaking || vm.busy,
                 needsKey = readyCount == 0,
-                openSettings = { vm.screen = Screen.Settings },
+                openSettings = { vm.setupSection = "providers"; vm.screen = Screen.Settings },
             )
         } else {
             LazyColumn(

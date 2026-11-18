@@ -38,8 +38,11 @@ class Agent(
     ) {
         val lastUser = history.lastOrNull { it.role == Role.USER }?.text.orEmpty()
 
+        // 0) "لا مش ده" right after an instant answer → forget that link; the big brain redoes the request.
+        val corrected = history.lastOrNull()?.role == Role.USER && fastBrain.onCorrection(lastUser)
+
         // 1) Instant local brain for simple commands (no internet, no quota).
-        if (history.lastOrNull()?.role == Role.USER) {
+        if (!corrected && history.lastOrNull()?.role == Role.USER) {
             fastBrain.tryHandle(lastUser)?.let { msgs ->
                 msgs.forEach { history += it; emit(it) }
                 return
@@ -47,9 +50,10 @@ class Agent(
         }
 
         // 2) Cloud AI for everything else.
-        val system = systemPrompt(lastUser)
+        val system = systemPrompt(lastUser) + recap(history)
 
         val actions = mutableListOf<Pair<com.myassistant.app.core.ToolCall, String>>()
+        val startedAt = System.currentTimeMillis()
         val approvedGroups = mutableSetOf<String>()
         val settings = toolContext.settings
         toolContext.recorder = mutableListOf()
@@ -62,6 +66,7 @@ class Agent(
             history += reply
             emit(reply)
             if (reply.toolCalls.isEmpty()) {
+                logAi(lastUser, actions, reply.text, startedAt, usedScreen)
                 val recipe = toolContext.recorder?.toList().orEmpty()
                 toolContext.recorder = null
                 if (usedScreen && recipe.isNotEmpty() && !toolContext.recordFailed) {
@@ -112,6 +117,16 @@ class Agent(
         }
     }
 
+    /** Notes how the big brain handled a request (for the nightly teacher). */
+    private suspend fun logAi(text: String, actions: List<Pair<com.myassistant.app.core.ToolCall, String>>, reply: String, startedAt: Long, screen: Boolean) {
+        val detail = JSONObject()
+            .put("tools", org.json.JSONArray(actions.map { (c, r) -> JSONObject().put("tool", c.name).put("args", c.argsJson.take(300)).put("ok", failurePrefixes.none { r.startsWith(it) }) }))
+            .put("seconds", (System.currentTimeMillis() - startedAt) / 1000)
+            .put("screen", screen)
+            .put("reply", reply.take(200))
+        withContext(Dispatchers.IO) { com.myassistant.app.fast.BrainLog.add(toolContext.app, "ai", text, detail.toString()) }
+    }
+
     /**
      * If the big brain handled a short request with exactly one successful action, the fast brain
      * remembers it so the same phrase runs instantly next time.
@@ -153,6 +168,8 @@ class Agent(
             appendLine("- Email: the user's accounts all forward into one Gmail hub. Use check_email / search_email / read_email (each email says which account it was sent to), mark_email_read, draft_email (safe default for replies) or send_email (asks the user first).")
             appendLine("- If the user teaches a shortcut (\"when I say X do Y\" / \"لما أقول X اعمل Y\"), call teach_shortcut.")
             appendLine("- Never invent tool results; report what actually happened. Keep answers concise.")
+            appendLine("- Nova's fast brain is taught every night by a teacher; if asked what it learned, use teacher_report.")
+            appendLine("- Nova has NO settings page: the user changes everything by asking you. Use app_settings to see settings, change_setting to change them, check_update for updates. For API keys, the Gmail app password, backups or permissions use open_setup — never ask the user to paste a key or password in chat.")
             appendLine("- To work inside other apps be FAST: open_app, then read_screen once, then use do_steps with as many steps as you can in ONE call (tap N / tap text:… / tap id:… / type …). Use ids (#id) and visible texts rather than guessing. Each call returns the new screen. When done, answer in one short sentence.")
             appendLine("- If the user asks to save the steps of a task as a shortcut, use save_last_steps.")
             appendLine("- Health & places are built in: steps, walk_tracking (start/stop). Nova tracks where the user is all day: save_place (\"سجل المكان ده باسم X\"), places_visited (a day's places; days start at 3 AM). For the way to a place (وديني) use navigate.")
@@ -164,6 +181,11 @@ class Agent(
             appendLine("- Current time: $now (${TimeZone.getDefault().id}).")
             withContext(Dispatchers.IO) { runCatching { com.myassistant.app.places.PlaceTracker.contextLine(toolContext.app) }.getOrNull() }
                 ?.let { appendLine("- Places: $it") }
+            withContext(Dispatchers.IO) { runCatching { com.myassistant.app.prayer.Prayers.contextLine(toolContext.app) }.getOrNull() }
+                ?.let { appendLine("- Prayers today: $it") }
+            withContext(Dispatchers.IO) { runCatching { com.myassistant.app.reading.Reading.contextLine(toolContext.app) }.getOrNull() }
+                ?.let { appendLine("- Reading habit (replacing bad habits — support it warmly, never preach): $it. Reading is counted automatically; use reading_report for history.") }
+            appendLine("- Habits: when the user says they prayed use prayed; when they mention reading Quran, studying, sleeping, drinking water or exercising, record it with log_habit (no need to ask). Answer habit questions with habit_report / prayer_report. Don't lecture; be encouraging and brief.")
             if (memories.isNotEmpty()) {
                 appendLine()
                 appendLine("Things you know about the user (from memory):")
@@ -172,17 +194,57 @@ class Agent(
         }
     }
 
-    /** Keeps recent context only, always cutting at the start of a user turn. */
-    private fun trimmed(history: List<ChatMessage>): List<ChatMessage> {
-        if (history.size <= MAX_CONTEXT) return history
+    /** Index where the context window starts: the last [KEEP_TURNS] user turns, within a size budget. */
+    private fun windowStart(history: List<ChatMessage>): Int {
         val userStarts = history.indices.filter { history[it].role == Role.USER }
-        val start = userStarts.firstOrNull { history.size - it <= MAX_CONTEXT } ?: userStarts.lastOrNull() ?: 0
-        return history.subList(start, history.size)
+        if (userStarts.isEmpty()) return 0
+        var turns = minOf(KEEP_TURNS, userStarts.size)
+        while (turns > 2) {
+            val from = userStarts[userStarts.size - turns]
+            val size = history.subList(from, history.size).sumOf { it.text.length.coerceAtMost(TOOL_KEEP_CHARS) + 80 }
+            if (size <= MAX_CONTEXT_CHARS) break
+            turns--
+        }
+        return userStarts[userStarts.size - turns]
+    }
+
+    /**
+     * What the AI sees: whole recent turns (never cut mid-turn, so tool calls and results stay paired),
+     * with long tool results from earlier turns shortened — a finished task's screen dump isn't needed anymore.
+     */
+    private fun trimmed(history: List<ChatMessage>): List<ChatMessage> {
+        val start = windowStart(history)
+        val kept = history.subList(start, history.size)
+        val currentTurn = kept.indexOfLast { it.role == Role.USER }
+        // inside the current task, only the last few tool results matter in full (older screens are stale)
+        val recentTools = kept.indices.filter { it > currentTurn && kept[it].role == Role.TOOL }.takeLast(4).toSet()
+        return kept.mapIndexed { i, m ->
+            when {
+                m.role != Role.TOOL -> m
+                i < currentTurn && m.text.length > TOOL_KEEP_CHARS -> m.copy(text = m.text.take(TOOL_KEEP_CHARS) + " …(shortened)")
+                i > currentTurn && i !in recentTools && m.text.length > 1_000 -> m.copy(text = m.text.take(1_000) + " …(older step, shortened)")
+                else -> m
+            }
+        }
+    }
+
+    /** A short recap of what was said before the window, so long chats don't lose the thread. */
+    private fun recap(history: List<ChatMessage>): String {
+        val start = windowStart(history)
+        if (start <= 0) return ""
+        val lines = history.subList(0, start)
+            .filter { it.role == Role.USER || (it.role == Role.ASSISTANT && it.text.isNotBlank()) }
+            .map { (if (it.role == Role.USER) "User: " else "Nova: ") + it.text.replace('\n', ' ').take(180) }
+        val text = lines.joinToString("\n").takeLast(RECAP_CHARS)
+        return "\n\nEarlier in this conversation (older messages, shortened):\n$text\n"
     }
 
     private companion object {
         const val MAX_STEPS = 20
-        const val MAX_CONTEXT = 40
+        const val KEEP_TURNS = 12
+        const val MAX_CONTEXT_CHARS = 40_000
+        const val TOOL_KEEP_CHARS = 300
+        const val RECAP_CHARS = 2_500
         const val ALWAYS_INCLUDE = 30
     }
 }

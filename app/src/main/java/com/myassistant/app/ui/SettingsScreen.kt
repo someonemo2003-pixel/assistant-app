@@ -89,7 +89,12 @@ fun SettingsScreen(vm: AppViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("الإعدادات", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        when (vm.setupSection) { "gmail" -> "Gmail"; "backup" -> "نسخة احتياطية"; else -> "المزوّدين" },
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { vm.screen = Screen.Chat }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع")
@@ -103,63 +108,10 @@ fun SettingsScreen(vm: AppViewModel) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Button(onClick = { vm.screen = Screen.Permissions }, modifier = Modifier.fillMaxWidth()) {
-                    Text("الصلاحيات (التحكم في الموبايل)")
-                }
-            }
-            item { MailCard(vm) }
-            item { ReportCard(vm) }
-            item {
-                Text("الصوت", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        ToggleRow("يرد عليا بصوت", "لما تكلمه بصوتك، يقرالك الرد", speakReplies) { vm.settings.setSpeakReplies(it) }
-                        ToggleRow(
-                            "محادثة متواصلة",
-                            "بعد ما يرد، يسمعك تاني على طول من غير ما تدوس. قول \"خلاص\" أو \"شكراً\" عشان يقف.",
-                            handsFree,
-                        ) { vm.settings.setHandsFree(it) }
-                        Row {
-                            TextButton(onClick = {
-                                runCatching {
-                                    ctx.startActivity(android.content.Intent("com.android.settings.TTS_SETTINGS").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                                }
-                            }) { Text("صوت القراءة") }
-                            TextButton(onClick = {
-                                runCatching {
-                                    ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                                }.onFailure {
-                                    runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                                }
-                            }) { Text("المساعد الافتراضي") }
-                        }
-                    }
-                }
-            }
-            item {
-                Text("العقل السريع والتعلّم", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        ToggleRow(
-                            "يتعلم من العقل الكبير",
-                            "الأوامر اللي العقل الكبير ينفّذها صح تتحفظ، والمرة الجاية تتنفّذ فوراً",
-                            learn,
-                        ) { vm.settings.setLearnFromAi(it) }
-                        ToggleRow(
-                            "يملأ الذاكرة لوحده",
-                            "لما تبدأ محادثة جديدة، يحفظ المعلومات المهمة من اللي فاتت (طلب واحد للعقل الكبير)",
-                            autoMemory,
-                        ) { vm.settings.setAutoMemory(it) }
-                        TextButton(onClick = { vm.screen = Screen.Learned }) { Text("شوف اللي اتعلمه ") }
-                    }
-                }
-            }
-            item { MeaningModelCard(meaning, onDownload = vm::downloadMeaningModel, onDelete = vm::deleteMeaningModel) }
+            when (vm.setupSection) {
+            "gmail" -> item { MailCard(vm) }
+            "backup" -> item { BackupCard(vm) }
+            else -> {
             item {
                 Text("مين يعمل إيه", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -192,10 +144,6 @@ fun SettingsScreen(vm: AppViewModel) {
                     onEdit = { editing = c },
                 )
             }
-            item { FocusCard() }
-            item { GuardCard() }
-            item { UpdateCard() }
-            item { BackupCard(vm) }
             item {
                 OutlinedButton(
                     onClick = {
@@ -210,6 +158,8 @@ fun SettingsScreen(vm: AppViewModel) {
                     Spacer(Modifier.size(8.dp))
                     Text("إضافة مزوّد تاني")
                 }
+            }
+            }
             }
         }
     }
@@ -415,7 +365,8 @@ private fun ProviderCard(
                     config.model.ifBlank { "—" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
+                    softWrap = true,
                 )
                 Spacer(Modifier.size(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

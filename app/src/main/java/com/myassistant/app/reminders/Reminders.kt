@@ -220,6 +220,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 runCatching { com.myassistant.app.mail.DailyReport.schedule(ctx) }
                 runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
                 runCatching { com.myassistant.app.places.PlaceTracker.start(ctx) }
+                runCatching { com.myassistant.app.prayer.Prayers.scheduleNext(ctx) }
             }
             "time" -> {
                 val r = store.get(intent.getLongExtra("id", -1)) ?: return

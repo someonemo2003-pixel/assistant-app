@@ -56,6 +56,7 @@ class ScreenService : AccessibilityService() {
         if (com.myassistant.app.admin.DeviceOwner.isOwner(this)) Thread { com.myassistant.app.focus.Focus.apply(applicationContext) }.start()
         performGlobalAction(GLOBAL_ACTION_HOME)
         toast("⏳ $why")
+        Thread { runCatching { com.myassistant.app.reading.Reading.offerInstead(applicationContext) } }.start()
     }
 
     private fun guard(event: AccessibilityEvent) {
@@ -135,6 +136,7 @@ class ScreenService : AccessibilityService() {
             val hit = blockedApps.firstOrNull { b -> b.name.length >= 3 && trimmed.any { it.equals(b.name, true) } } ?: return
             performGlobalAction(GLOBAL_ACTION_BACK)
             toast("🚫 ${hit.name} ممنوع على الموبايل ده")
+            Thread { runCatching { com.myassistant.app.reading.Reading.offerInstead(applicationContext) } }.start()
             return
         }
 
@@ -199,6 +201,7 @@ class ScreenService : AccessibilityService() {
             }
         }
         handler.post { showCovers(toCover, hitName) }
+        if (toCover.isNotEmpty()) Thread { runCatching { com.myassistant.app.reading.Reading.offerInstead(applicationContext) } }.start()
     }
 
     private fun clearCovers() = handler.post {

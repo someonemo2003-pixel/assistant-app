@@ -81,6 +81,16 @@ class AppGraph(context: Context) {
     val settings = AppSettings(context)
     val secrets = SecretStore(context)
     val providers = ProviderStore(context, secrets)
+
+    init {
+        // New recommended defaults (Kimi for chat, Groq for phone actions) — applied once on existing installs.
+        runCatching {
+            providers.applyDefaultsOnce()?.let { (chat, action) ->
+                chat?.let { settings.setChatBrain(it) }
+                action?.let { settings.setActionBrain(it) }
+            }
+        }
+    }
     val memory: MemoryStore = SqliteMemoryStore(context)
     val chats = ChatStore(context)
     val experience = ExperienceStore(context)
@@ -96,6 +106,11 @@ class AppGraph(context: Context) {
         // phone data
         com.myassistant.app.admin.BlockAppTool(), com.myassistant.app.admin.ListBlockedTool(),
         com.myassistant.app.admin.SuspendAppTool(), com.myassistant.app.admin.LockPhoneTool(),
+        com.myassistant.app.settings.AppStatusTool(), com.myassistant.app.settings.ChangeSettingTool(),
+        com.myassistant.app.settings.CheckUpdateTool(), com.myassistant.app.settings.OpenSetupTool(),
+        com.myassistant.app.teacher.TeacherReportTool(),
+        com.myassistant.app.prayer.PrayedTool(), com.myassistant.app.prayer.PrayerReportTool(),
+        com.myassistant.app.prayer.LogHabitTool(), com.myassistant.app.prayer.HabitReportTool(), com.myassistant.app.reading.ReadingReportTool(),
         com.myassistant.app.focus.FocusAddTool(), com.myassistant.app.focus.FocusListTool(), com.myassistant.app.focus.FocusRemoveTool(),
         ReadNotificationsTool(), MissedMessagesTool(), ReplyNotificationTool(), com.myassistant.app.control.SendWhatsAppTool(), ClearNotificationsTool(), NotificationAlertTool(),
         FindContactTool(), CallTool(), SendSmsTool(), ReadSmsTool(), RecentCallsTool(),
@@ -144,6 +159,8 @@ class AppGraph(context: Context) {
         runCatching { com.myassistant.app.admin.DeviceOwner.protectSelf(appContext); com.myassistant.app.admin.DeviceOwner.enforce(appContext) }
         runCatching { com.myassistant.app.focus.Focus.apply(appContext) }
         runCatching { com.myassistant.app.places.PlaceTracker.start(appContext) }
+        runCatching { com.myassistant.app.prayer.Prayers.scheduleNext(appContext) }
+        runCatching { com.myassistant.app.teacher.Teacher.schedule(appContext) }
         runCatching { com.myassistant.app.update.Updater.schedule(appContext) }
         runCatching { com.myassistant.app.health.Health.schedule(appContext) }
         appScope.launch { runCatching { com.myassistant.app.health.Health.sampleSteps(appContext) } }

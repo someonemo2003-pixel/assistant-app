@@ -13,7 +13,20 @@ sealed interface LocalIntent {
     data class Flashlight(val on: Boolean) : LocalIntent
     data class Steps(val period: String) : LocalIntent
     data class Walk(val start: Boolean) : LocalIntent
-    data class ShowMap(val day: String) : LocalIntent
+    /** Where the user went on a day (places log). */
+    data class Places(val day: String) : LocalIntent
+    /** "صليت العصر" — prayer may be null (= the current one). */
+    data class Prayed(val prayer: String?) : LocalIntent
+    /** "العصر امتى؟" / "فاضل قد ايه على المغرب" / "مواعيد الصلاة". */
+    data class PrayerTime(val prayer: String?, val remaining: Boolean) : LocalIntent
+    /** "قريت 5 صفحات" / "ذاكرت ساعة" / "شربت كوبايتين" / "نمت 6 ساعات". */
+    data class Habit(val habit: String, val amount: Double, val unit: String) : LocalIntent
+    /** "سجل المكان ده باسم الجامعة". */
+    data class SavePlace(val name: String) : LocalIntent
+    data class Silent(val on: Boolean) : LocalIntent
+    data object Battery : LocalIntent
+    data object LockPhone : LocalIntent
+    data object CheckUpdate : LocalIntent
     data object AskTime : LocalIntent
     data object AskDate : LocalIntent
 }
@@ -25,6 +38,35 @@ object FastParser {
         if (original.isEmpty() || original.length > 80) return null
         val t = normalize(original)
         val words = t.split(' ').filter { it.isNotEmpty() }
+
+        // "سجل المكان ده باسم X" (before "سجل/افتكر" = remember).
+        savePlaceRegex.find(original)?.let { m ->
+            val name = m.groupValues[1].trim().trimEnd('.', '!', '؟', '?')
+            if (name.isNotEmpty() && name.length <= 30) return LocalIntent.SavePlace(name)
+        }
+
+        // Prayers
+        val prayerWord = words.firstNotNullOfOrNull { w -> prayerNames.entries.firstOrNull { w == it.key || w == "ال" + it.key }?.value }
+        if (words.firstOrNull() in setOf("صليت", "صلّيت") || (words.firstOrNull() == "انا" && words.getOrNull(1) == "صليت")) {
+            if (words.size <= 4) return LocalIntent.Prayed(prayerWord)
+        }
+        if (hasAny(t, "مواعيد الصلاه", "مواقيت الصلاه", "الصلاه امتي", "الصلاه الجايه")) return LocalIntent.PrayerTime(null, "فاضل" in words)
+        val aboutAlarm = alarmWords.any { w -> words.any { it.startsWith(w) } }
+        if (prayerWord != null && !aboutAlarm && (hasAny(t, "امتي", "امتى", "الساعه كام", "الساعه كم", "بيأذن", "بيدن", "هيأذن") || "فاضل" in words)) {
+            return LocalIntent.PrayerTime(prayerWord, "فاضل" in words)
+        }
+
+        // Habits
+        habit(t, words)?.let { return it }
+
+        // Phone basics
+        if (words.any { it.endsWith("صامت") || it.endsWith("سايلنت") || it == "silent" }) {
+            val off = words.any { it in setOf("شيل", "الغي", "اقفل", "رجع", "ارجع", "بطل") }
+            return LocalIntent.Silent(!off)
+        }
+        if (hasAny(t, "البطاريه كام", "كام البطاريه", "الشحن كام", "كام الشحن", "البطاريه فيها كام", "battery")) return LocalIntent.Battery
+        if (hasAny(t, "اقفل الشاشه", "قفل الشاشه", "اقفل الموبايل", "lock screen")) return LocalIntent.LockPhone
+        if (hasAny(t, "فيه تحديث", "في تحديث", "حدث نفسك", "اخر نسخه", "شوف التحديث", "دور علي تحديث", "check update")) return LocalIntent.CheckUpdate
 
         // Remember: keep the user's own wording for the fact.
         rememberRegex.find(original)?.let { m ->
@@ -47,10 +89,10 @@ object FastParser {
         if (aboutWalk && words.any { it in setOf("ابدا", "ابدء", "شغل", "start") }) return LocalIntent.Walk(true)
         if (aboutWalk && words.any { it in setOf("وقف", "اقفل", "خلص", "stop", "انهي") }) return LocalIntent.Walk(false)
         val startsWithOpen = words.firstOrNull()?.let { it in openWords } == true
-        if ("مشيت فين" in t || "رحت فين" in t || "روحت فين" in t ||
+        if ("مشيت فين" in t || "رحت فين" in t || "روحت فين" in t || "كنت فين" in t || t == "انا فين" || "انا فين دلوقتي" in t ||
             (!startsWithOpen && words.any { it == "خريطه" || it == "الخريطه" || it == "خريطتي" })
         ) {
-            return LocalIntent.ShowMap(day)
+            return LocalIntent.Places(day)
         }
 
         val wantsAlarm = alarmWords.any { w -> words.any { it.startsWith(w) } } || "alarm" in words
@@ -171,7 +213,7 @@ object FastParser {
 
     // ---------- learned phrases ----------
 
-    private val politeWords = setOf("لو", "سمحت", "فضلك", "please", "pls", "بقي", "يا", "مساعدي", "nova", "نوفا", "ممكن", "عايزك", "عاوزك")
+    internal val politeWords = setOf("لو", "سمحت", "فضلك", "please", "pls", "بقي", "يا", "مساعدي", "nova", "نوفا", "ممكن", "عايزك", "عاوزك")
 
     /** Stable key for a learned phrase: normalised, without polite filler words. */
     fun phraseKey(text: String): String =
@@ -201,6 +243,68 @@ object FastParser {
     }
 
     private fun hasAny(t: String, vararg parts: String) = parts.any { t.contains(it) }
+
+    private val prayerNames = mapOf(
+        "فجر" to "fajr", "صبح" to "fajr", "ظهر" to "dhuhr", "ضهر" to "dhuhr", "جمعه" to "dhuhr",
+        "عصر" to "asr", "مغرب" to "maghrib", "عشا" to "isha", "عشاء" to "isha",
+    )
+
+    private val savePlaceRegex = Regex(
+        "^\\s*(?:سجل|سجّل|احفظ|احفظلي|سجلي)\\s+(?:لي\\s+)?(?:المكان|مكاني|الموقع|موقعي|المكان اللي انا فيه)\\s*(?:ده|دا|دة|هنا|الحالي)?\\s+(?:باسم|بإسم|بأسم|بسم|اسمه|إسمه|ب)\\s*(.+)$",
+    )
+
+    private fun count(words: List<String>, i: Int): Double? {
+        val prev = words.getOrNull(i - 1) ?: return null
+        return prev.toDoubleOrNull() ?: numberWords[prev]?.toDouble()
+    }
+
+    /** "قريت 5 صفحات", "ذاكرت ساعتين", "شربت 3 كوبايات", "نمت 6 ساعات", "اتمرنت نص ساعة". */
+    private fun habit(t: String, words: List<String>): LocalIntent.Habit? {
+        val verb = words.firstOrNull() ?: return null
+        fun minutes(): Double? {
+            if ("نص ساعه" in t) return 30.0
+            if ("ربع ساعه" in t) return 15.0
+            if ("ساعتين" in words) return 120.0
+            for (i in words.indices) {
+                when (words[i]) {
+                    "ساعه", "ساعات" -> return (count(words, i) ?: 1.0) * 60 + if ("ونص" in words) 30 else 0
+                    "دقيقه", "دقايق", "دقائق" -> return count(words, i)
+                    "دقيقتين" -> return 2.0
+                }
+            }
+            return null
+        }
+        return when (verb) {
+            "قريت", "قرات", "خلصت" -> {
+                val i = words.indexOfFirst { it.startsWith("صفح") }
+                val pages: Double? = when {
+                    i < 0 -> null
+                    words[i] == "صفحتين" -> 2.0
+                    else -> count(words, i) ?: 1.0
+                }
+                val quran = words.any { it.contains("قران") || it == "ورد" || it == "وردي" || it == "جزء" }
+                when {
+                    pages != null -> LocalIntent.Habit(if (quran) "quran" else "reading", pages, "pages")
+                    quran && "جزء" in words -> LocalIntent.Habit("quran", 20.0, "pages")
+                    else -> minutes()?.let { LocalIntent.Habit(if (quran) "quran" else "reading", it, "minutes") }
+                }
+            }
+            "ذاكرت", "ذكرت", "زاكرت" -> minutes()?.let { LocalIntent.Habit("study", it, "minutes") }
+            "نمت" -> minutes()?.let { LocalIntent.Habit("sleep", it / 60.0, "hours") }
+            "اتمرنت", "لعبت", "جريت" -> minutes()?.let { LocalIntent.Habit("exercise", it, "minutes") }
+            "شربت" -> {
+                if (words.none { it.startsWith("مي") || it.startsWith("ماي") || it.startsWith("كوباي") || it.startsWith("كباي") }) return null
+                val i = words.indexOfFirst { it.startsWith("كوباي") || it.startsWith("كباي") }
+                val cups = when {
+                    i < 0 -> 1.0
+                    words[i].endsWith("تين") -> 2.0
+                    else -> count(words, i) ?: 1.0
+                }
+                LocalIntent.Habit("water", cups, "cups")
+            }
+            else -> null
+        }
+    }
 
     private val rememberRegex = Regex("^\\s*(افتكر|افتكري|احفظ|سجل|سجّل|remember)\\s+(?:ان|أن|إن|انّ|that\\s+)?\\s*(.+)$")
 

@@ -71,7 +71,7 @@ fun PermissionsScreen(vm: AppViewModel) {
             TopAppBar(
                 title = { Text("الصلاحيات ($grantedCount/${items.size})", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { vm.screen = Screen.Settings }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
+                    IconButton(onClick = { vm.screen = Screen.Chat }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
                 },
             )
         },

@@ -14,7 +14,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun AppRoot(vm: AppViewModel = viewModel()) {
     BackHandler(enabled = vm.screen != Screen.Chat) {
-        vm.screen = if (vm.screen == Screen.Learned || vm.screen == Screen.Permissions) Screen.Settings else Screen.Chat
+        vm.screen = Screen.Chat
     }
 
     AnimatedContent(

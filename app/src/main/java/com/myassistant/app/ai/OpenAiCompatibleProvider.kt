@@ -55,6 +55,8 @@ class OpenAiCompatibleProvider(
         }
 
         val body = JSONObject().put("model", model).put("messages", messages)
+        // OpenRouter silently drops the middle of long chats for small models ("middle-out"); keep everything.
+        if ("openrouter.ai" in base) body.put("transforms", JSONArray())
         if (tools.isNotEmpty()) {
             val arr = JSONArray()
             tools.forEach { t ->

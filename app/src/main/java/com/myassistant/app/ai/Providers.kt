@@ -41,9 +41,33 @@ data class ProviderConfig(
     }
 }
 
-/** Ready-made providers. Add a line here to ship a new built-in one. */
+/** Ready-made providers, in the default fallback order. Add a line here to ship a new built-in one. */
 object ProviderPresets {
+    const val NVIDIA_URL = "https://integrate.api.nvidia.com/v1"
+    const val KIMI_MODEL = "moonshotai/kimi-k3.1-pro"
+    const val NEMOTRON_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+    const val GROQ_MODEL = "openai/gpt-oss-120b"
+
     val defaults = listOf(
+        // Smartest free model: chat, the Gmail report, the nightly teacher.
+        ProviderConfig(
+            id = "nvidia-kimi", type = ProviderType.OPENAI_COMPATIBLE, name = "NVIDIA Kimi",
+            baseUrl = NVIDIA_URL, model = KIMI_MODEL, builtIn = true,
+            keyUrl = "https://build.nvidia.com/settings/api-keys",
+        ),
+        // Fast and still strong; uses the same NVIDIA key.
+        ProviderConfig(
+            id = "nvidia-nemotron", type = ProviderType.OPENAI_COMPATIBLE, name = "Nemotron 3 Ultra",
+            baseUrl = NVIDIA_URL, model = NEMOTRON_MODEL, builtIn = true,
+            keyUrl = "https://build.nvidia.com/settings/api-keys",
+        ),
+        // Fastest: phone actions.
+        ProviderConfig(
+            id = "groq", type = ProviderType.OPENAI_COMPATIBLE, name = "Groq",
+            baseUrl = "https://api.groq.com/openai/v1",
+            model = GROQ_MODEL, builtIn = true,
+            keyUrl = "https://console.groq.com/keys",
+        ),
         ProviderConfig(
             id = "gemini", type = ProviderType.GEMINI, name = "Gemini",
             baseUrl = "https://generativelanguage.googleapis.com/v1beta",
@@ -51,18 +75,27 @@ object ProviderPresets {
             keyUrl = "https://aistudio.google.com/apikey",
         ),
         ProviderConfig(
-            id = "groq", type = ProviderType.OPENAI_COMPATIBLE, name = "Groq",
-            baseUrl = "https://api.groq.com/openai/v1",
-            model = "llama-3.3-70b-versatile", builtIn = true,
-            keyUrl = "https://console.groq.com/keys",
-        ),
-        ProviderConfig(
             id = "openrouter", type = ProviderType.OPENAI_COMPATIBLE, name = "OpenRouter",
             baseUrl = "https://openrouter.ai/api/v1",
-            model = "meta-llama/llama-3.3-70b-instruct:free", builtIn = true,
+            model = "openrouter/free", builtIn = true,
             keyUrl = "https://openrouter.ai/keys",
         ),
     )
+
+    fun isNvidia(c: ProviderConfig) = "integrate.api.nvidia.com" in c.baseUrl
+    fun isKimi(c: ProviderConfig) = isNvidia(c) && (c.model.startsWith("moonshotai/") || c.name.contains("kimi", true))
+    fun isNemotron(c: ProviderConfig) = isNvidia(c) && (c.model.contains("nemotron") || c.name.contains("nemotron", true))
+    fun isGroq(c: ProviderConfig) = "api.groq.com" in c.baseUrl
+
+    /** Default order: Kimi → Nemotron → Groq → Gemini → OpenRouter → anything else. */
+    fun rank(c: ProviderConfig) = when {
+        isKimi(c) -> 0
+        isNemotron(c) -> 1
+        isGroq(c) -> 2
+        c.type == ProviderType.GEMINI -> 3
+        "openrouter.ai" in c.baseUrl -> 4
+        else -> 5
+    }
 }
 
 object ProviderFactory {
@@ -83,8 +116,15 @@ class ProviderStore(context: Context, private val secrets: SecretStore) {
     private val _keysVersion = MutableStateFlow(0)
     val keysVersion: StateFlow<Int> = _keysVersion.asStateFlow()
 
-    fun hasKey(id: String) = secrets.has(keyName(id))
-    fun apiKey(id: String) = secrets.get(keyName(id))
+    fun hasKey(id: String) = apiKey(id)?.isNotBlank() == true
+
+    /** The provider's own key, or the key of another provider on the same service (e.g. one NVIDIA key for both). */
+    fun apiKey(id: String): String? {
+        secrets.get(keyName(id))?.takeIf { it.isNotBlank() }?.let { return it }
+        val me = _configs.value.firstOrNull { it.id == id } ?: return null
+        return _configs.value.filter { it.id != id && it.baseUrl.trimEnd('/') == me.baseUrl.trimEnd('/') }
+            .firstNotNullOfOrNull { secrets.get(keyName(it.id))?.takeIf { k -> k.isNotBlank() } }
+    }
 
     fun setApiKey(id: String, key: String?) {
         secrets.put(keyName(id), key?.trim())
@@ -119,8 +159,36 @@ class ProviderStore(context: Context, private val secrets: SecretStore) {
 
     private fun keyName(id: String) = "api_key_$id"
 
+    /**
+     * One-time setup of the recommended defaults on an existing install: fixes NVIDIA model names, adds the
+     * missing built-ins, puts them in the recommended order, and returns (chat brain id, action brain id).
+     */
+    fun applyDefaultsOnce(): Pair<String?, String?>? {
+        if (prefs.getBoolean("defaults_v2", false)) return null
+        var list = _configs.value.map { c ->
+            when {
+                ProviderPresets.isKimi(c) && !c.model.startsWith("moonshotai/kimi") -> c.copy(model = ProviderPresets.KIMI_MODEL)
+                ProviderPresets.isKimi(c) && c.model.endsWith("/") -> c.copy(model = ProviderPresets.KIMI_MODEL)
+                ProviderPresets.isNemotron(c) && (c.model.endsWith("/") || !c.model.contains("nemotron")) -> c.copy(model = ProviderPresets.NEMOTRON_MODEL)
+                ProviderPresets.isGroq(c) && c.builtIn -> c.copy(model = ProviderPresets.GROQ_MODEL)
+                else -> c
+            }
+        }
+        // add the built-ins that aren't there yet (an existing NVIDIA provider already covers Kimi/Nemotron)
+        for (p in ProviderPresets.defaults) {
+            val covered = list.any { it.id == p.id } ||
+                (ProviderPresets.isKimi(p) && list.any { ProviderPresets.isKimi(it) }) ||
+                (ProviderPresets.isNemotron(p) && list.any { ProviderPresets.isNemotron(it) })
+            if (!covered) list = list + p
+        }
+        list = list.sortedBy { ProviderPresets.rank(it) }
+        save(list)
+        prefs.edit().putBoolean("defaults_v2", true).apply()
+        return list.firstOrNull { ProviderPresets.isKimi(it) }?.id to list.firstOrNull { ProviderPresets.isGroq(it) }?.id
+    }
+
     private fun load(): List<ProviderConfig> {
-        val stored = prefs.getString("list", null) ?: return ProviderPresets.defaults
+        val stored = prefs.getString("list", null) ?: return ProviderPresets.defaults.also { prefs.edit().putBoolean("defaults_v2", true).apply() }
         return try {
             val arr = JSONArray(stored)
             (0 until arr.length()).map { ProviderConfig.fromJson(arr.getJSONObject(it)) }

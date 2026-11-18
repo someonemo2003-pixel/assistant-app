@@ -15,9 +15,9 @@ import java.util.zip.ZipOutputStream
  */
 object Backup {
     private val databases = listOf(
-        "memory.db", "chats.db", "experience.db", "notifications.db", "activity.db", "reminders.db", "expenses.db", "visits.db",
+        "memory.db", "chats.db", "experience.db", "notifications.db", "activity.db", "reminders.db", "expenses.db", "visits.db", "habits.db", "brainlog.db",
     )
-    private val prefs = listOf("settings", "providers", "mail", "report", "health", "expenses", "accounts", "guard", "focus", "updates")
+    private val prefs = listOf("settings", "providers", "mail", "report", "health", "expenses", "accounts", "guard", "focus", "updates", "prayer", "reading", "teacher")
 
     fun export(ctx: Context, target: Uri): Int {
         var count = 0

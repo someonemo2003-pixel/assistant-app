@@ -4,6 +4,7 @@ import com.myassistant.app.core.ChatMessage
 import com.myassistant.app.core.Role
 import com.myassistant.app.core.ToolCall
 import com.myassistant.app.core.newId
+import com.myassistant.app.prayer.Prayer
 import com.myassistant.app.tools.ToolContext
 import com.myassistant.app.tools.ToolRegistry
 import com.myassistant.app.tools.has
@@ -21,11 +22,53 @@ import java.util.Locale
  */
 class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
 
+    /** What the fast brain did last (so "لا مش ده" can undo the link). */
+    private data class LastAction(val text: String, val experienceId: Long?, val how: String, val at: Long)
+    @Volatile private var last: LastAction? = null
+
     suspend fun tryHandle(text: String): List<ChatMessage>? {
+        if (BrainLog.isBlocked(ctx.app, text)) return null // the user said a fast answer to this was wrong
+        val out = handle(text)
+        if (out != null) {
+            val how = lastHow
+            last = LastAction(text, lastExperienceId, how, System.currentTimeMillis())
+            BrainLog.add(ctx.app, "fast", text, how)
+        }
+        lastExperienceId = null; lastHow = "rule"
+        return out
+    }
+
+    /**
+     * "لا مش ده" right after a fast answer: forget that link and let the big brain handle it.
+     * Returns true if a recent fast action was undone.
+     */
+    suspend fun onCorrection(userText: String): Boolean {
+        val l = last ?: return false
+        if (System.currentTimeMillis() - l.at > 3 * 60_000L || !isCorrection(userText)) return false
+        last = null
+        withContext(Dispatchers.IO) {
+            // exact phrase learned wrongly → delete it; matched by meaning/template → just block this phrase
+            if (l.how == "exact" && l.experienceId != null) ctx.experience.delete(l.experienceId)
+            BrainLog.block(ctx.app, l.text)
+            BrainLog.add(ctx.app, "corrected", l.text, l.how)
+        }
+        return true
+    }
+
+    private fun isCorrection(t: String): Boolean {
+        val n = FastParser.normalize(t)
+        if (n.length > 30) return false
+        return listOf("لا مش ده", "مش ده", "لا مش كده", "مش كده", "غلط", "لا غلط", "مش ده اللي", "انا مقولتش", "لا لا").any { n.startsWith(it) } || n == "لا"
+    }
+
+    @Volatile private var lastExperienceId: Long? = null
+    @Volatile private var lastHow = "rule"
+
+    private suspend fun handle(text: String): List<ChatMessage>? {
         // Shortcuts the user taught come first, then built-in rules, then things learned from the AI.
         fromExperience(text, userOnly = true)?.let { return it }
         val intent = FastParser.parse(text)
-            ?: return fromExperience(text, userOnly = false) ?: fromMeaning(text)
+            ?: return fromExperience(text, userOnly = false) ?: fromTemplate(text) ?: fromMeaning(text)
         return when (intent) {
             is LocalIntent.AskTime -> listOf(reply("الساعة دلوقتي ${clock(nowHour(), nowMinute())}"))
             is LocalIntent.AskDate -> listOf(reply("النهارده ${SimpleDateFormat("EEEE d MMMM yyyy", Locale("ar", "EG")).format(Date())}"))
@@ -73,14 +116,60 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 }
                 actionMessages("walk_tracking", args, r, text)
             }
-            is LocalIntent.ShowMap -> {
-                val tool = tools["show_route"] ?: return null
+            is LocalIntent.Places -> {
+                val tool = tools["places_visited"] ?: return null
                 val args = JSONObject().put("day", intent.day)
                 val r = tool.execute(args, ctx)
+                actionMessages("places_visited", args, r, if (r.startsWith("No places")) "مفيش أماكن متسجّلة لليوم ده." else r)
+            }
+            is LocalIntent.Prayed -> {
+                val tool = tools["prayed"] ?: return null
+                val args = JSONObject().apply { intent.prayer?.let { put("prayer", it) } }
+                val r = tool.execute(args, ctx)
+                if (r == "Which prayer?") return null
+                actionMessages("prayed", args, r, "تقبل الله ✓ (" + r + ")")
+            }
+            is LocalIntent.PrayerTime -> listOf(reply(prayerTimeText(intent)))
+            is LocalIntent.Habit -> {
+                val tool = tools["log_habit"] ?: return null
+                val args = JSONObject().put("habit", intent.habit).put("amount", intent.amount).put("unit", intent.unit)
+                val r = tool.execute(args, ctx)
+                actionMessages("log_habit", args, r, "سجلتها ✓")
+            }
+            is LocalIntent.SavePlace -> {
+                val tool = tools["save_place"] ?: return null
+                if (!ctx.has(tool.permissions)) return null
+                val args = JSONObject().put("name", intent.name)
+                val r = tool.execute(args, ctx)
                 actionMessages(
-                    "show_route", args, r,
-                    if (r.startsWith("Showing")) "فتحتلك الخريطة 🗺️" else "مفيش أماكن متسجّلة للوقت ده. فعّل \"الموقع طول الوقت\" من الصلاحيات.",
+                    "save_place", args, r,
+                    when {
+                        r.startsWith("Saved") -> "سجلت المكان ده باسم \"${intent.name}\" ✓"
+                        r.startsWith("Location is too vague") -> "الموقع مش دقيق دلوقتي — افتح الواي فاي أو الـ GPS وقولّي تاني."
+                        else -> "معرفتش أجيب مكانك دلوقتي، اتأكد إن الموقع شغال."
+                    },
                 )
+            }
+            is LocalIntent.Silent -> {
+                val tool = tools["set_volume"] ?: return null
+                val pct = if (intent.on) 0 else 70
+                val args = JSONObject().put("stream", "ring").put("percent", pct)
+                val r = tool.execute(args, ctx)
+                runCatching { tool.execute(JSONObject().put("stream", "notification").put("percent", pct), ctx) }
+                actionMessages("set_volume", args, r, if (intent.on) "الموبايل بقى صامت 🔕" else "رجّعت الصوت 🔔")
+            }
+            is LocalIntent.Battery -> {
+                val bm = ctx.app.getSystemService(android.content.Context.BATTERY_SERVICE) as android.os.BatteryManager
+                val level = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                listOf(reply("البطارية $level%" + if (bm.isCharging) " وبتشحن ⚡" else ""))
+            }
+            is LocalIntent.LockPhone -> run(
+                "lock_phone", JSONObject(), ok = { it.startsWith("🔒") }, success = "قفلت الشاشة 🔒", failure = "معرفتش أقفل الشاشة.",
+            )
+            is LocalIntent.CheckUpdate -> {
+                val tool = tools["check_update"] ?: return null
+                val r = tool.execute(JSONObject(), ctx)
+                actionMessages("check_update", JSONObject(), r, r)
             }
             is LocalIntent.Flashlight -> run(
                 "flashlight", JSONObject().put("on", intent.on.toString()),
@@ -101,19 +190,69 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val failed = listOf("Error", "Missing", "Invalid", "No ", "Cannot", "App not found").any { result.startsWith(it) }
         if (failed) return null // let the big brain try instead
         withContext(Dispatchers.IO) { ctx.experience.markUsed(exp.id) }
+        lastExperienceId = exp.id; lastHow = "exact"
         return actionMessages(exp.tool, args, result, exp.reply)
     }
 
-    /** Same request said differently: matched by the on-device meaning model. */
+    /**
+     * Same request with one word swapped, where that word is what the action used:
+     * learned "كلم أحمد" (contact=أحمد) + "كلم محمد" → call محمد. No AI, no meaning model needed.
+     */
+    private suspend fun fromTemplate(text: String): List<ChatMessage>? {
+        val all = withContext(Dispatchers.IO) { ctx.experience.all() }
+        val candidates = all.mapNotNull { e -> Templates.adapt(e.phrase, e.args, text, requireChange = true)?.let { e to it } }
+            .sortedByDescending { it.first.uses }
+        val (exp, argsJson) = candidates.firstOrNull() ?: return null
+        // two different learned actions fit → not sure, let the big brain decide
+        if (candidates.drop(1).any { it.first.tool != exp.tool }) return null
+        return replay(exp, argsJson, "template")
+    }
+
+    /** Same request said differently: matched by the on-device meaning model. Never replays with a different name/number. */
     private suspend fun fromMeaning(text: String): List<ChatMessage>? {
         val exp = ctx.recall.similarExperience(text) ?: return null
+        val argsJson = Templates.adapt(exp.phrase, exp.args, text, requireChange = false) ?: return null
+        return replay(exp, argsJson, "meaning")
+    }
+
+    private suspend fun replay(exp: Experience, argsJson: String, how: String): List<ChatMessage>? {
         val tool = tools[exp.tool]?.takeIf { it.learnable } ?: return null
-        val args = runCatching { JSONObject(exp.args) }.getOrNull() ?: return null
+        val args = runCatching { JSONObject(argsJson) }.getOrNull() ?: return null
         val result = tool.execute(args, ctx)
         val failed = listOf("Error", "Missing", "Invalid", "No ", "Cannot", "App not found").any { result.startsWith(it) }
         if (failed) return null
         withContext(Dispatchers.IO) { ctx.experience.markUsed(exp.id) }
-        return actionMessages(exp.tool, args, result, exp.reply)
+        lastExperienceId = exp.id; lastHow = how
+        val reply = if (argsJson == exp.args) exp.reply else Templates.adaptReply(exp.reply, exp.phrase, text)
+        return actionMessages(exp.tool, args, result, reply)
+    }
+
+    private fun prayerTimeText(i: LocalIntent.PrayerTime): String {
+        val times = com.myassistant.app.prayer.Prayers.times(ctx.app, 0)
+        val tf = SimpleDateFormat("h:mm", Locale("ar", "EG"))
+        val now = System.currentTimeMillis()
+        if (i.prayer == null) {
+            if (i.remaining) {
+                val next = Prayer.entries.firstOrNull { times.at(it) > now }
+                val at = next?.let { times.at(it) } ?: com.myassistant.app.prayer.Prayers.times(ctx.app, 1).fajr
+                return "فاضل ${minutesText(at - now)} على ${(next ?: Prayer.FAJR).ar}"
+            }
+            return Prayer.entries.joinToString("\n") { "${it.ar}: ${tf.format(Date(times.at(it)))}" }
+        }
+        val p = Prayer.of(i.prayer) ?: return "مش فاهم أنهي صلاة"
+        var at = times.at(p)
+        if (at < now) at = com.myassistant.app.prayer.Prayers.times(ctx.app, 1).at(p)
+        return if (i.remaining) "فاضل ${minutesText(at - now)} على ${p.ar}" else "${p.ar} الساعة ${tf.format(Date(at))}"
+    }
+
+    private fun minutesText(ms: Long): String {
+        val m = (ms / 60_000L).toInt()
+        val h = m / 60
+        return when {
+            h == 0 -> "$m دقيقة"
+            m % 60 == 0 -> if (h == 1) "ساعة" else "$h ساعات"
+            else -> (if (h == 1) "ساعة" else "$h ساعات") + " و${m % 60} دقيقة"
+        }
     }
 
     private suspend fun openApp(names: List<String>): List<ChatMessage>? {

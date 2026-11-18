@@ -58,7 +58,7 @@ class ExperienceStore(context: Context) : SQLiteOpenHelper(context, "experience.
         val key = FastParser.phraseKey(phrase)
         if (key.isEmpty()) return false
         // A user-taught shortcut is never overwritten by something learned automatically.
-        if (source == "ai" && find(phrase)?.source == "user") return false
+        if (source != "user" && find(phrase)?.source == "user") return false
         writableDatabase.insertWithOnConflict("experience", null, ContentValues().apply {
             putNull("vec")
             put("phrase", phrase.trim())

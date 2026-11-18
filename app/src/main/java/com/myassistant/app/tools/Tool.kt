@@ -112,6 +112,9 @@ object Schema {
 
     fun integer(description: String): JSONObject =
         JSONObject().put("type", "integer").put("description", description)
+
+    fun number(description: String): JSONObject =
+        JSONObject().put("type", "number").put("description", description)
 }
 
 fun JSONObject.str(key: String): String = if (isNull(key)) "" else optString(key).trim()

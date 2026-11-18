@@ -97,6 +97,7 @@ class SampleWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         runCatching { com.myassistant.app.focus.Focus.apply(ctx) }
         runCatching { withContext(Dispatchers.IO) { com.myassistant.app.finance.ExpenseSync.scanSms(ctx) } }
         runCatching { com.myassistant.app.places.PlaceTracker.start(ctx) } // restarts it if the system stopped it
+        runCatching { com.myassistant.app.prayer.Prayers.scheduleNext(ctx) }
         return Result.success()
     }
 }

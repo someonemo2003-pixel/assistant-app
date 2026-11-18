@@ -39,7 +39,7 @@ fun LearnedScreen(vm: AppViewModel) {
             TopAppBar(
                 title = { Text("اللي العقل السريع اتعلمه (${vm.experiences.size})", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { vm.screen = Screen.Settings }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
+                    IconButton(onClick = { vm.screen = Screen.Chat }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
                 },
             )
         },

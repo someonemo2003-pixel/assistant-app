@@ -57,8 +57,17 @@ class FastParserTest {
         assertEquals(LocalIntent.Steps("yesterday"), p("مشيت كام خطوة امبارح"))
         assertEquals(LocalIntent.Walk(true), p("ابدأ تتبع المشي"))
         assertEquals(LocalIntent.Walk(false), p("وقف المشي"))
-        assertEquals(LocalIntent.ShowMap("today"), p("وريني أنا مشيت فين النهارده"))
-        assertEquals(LocalIntent.ShowMap("yesterday"), p("ارسملي الخريطة بتاعة امبارح"))
+        assertEquals(LocalIntent.Places("today"), p("وريني أنا مشيت فين النهارده"))
+        assertEquals(LocalIntent.Places("yesterday"), p("ارسملي الخريطة بتاعة امبارح"))
+        assertEquals(LocalIntent.SavePlace("الجامعة"), p("سجل المكان ده باسم الجامعة"))
+        assertEquals(LocalIntent.Prayed("asr"), p("صليت العصر"))
+        assertEquals(LocalIntent.Prayed(null), p("صليت"))
+        assertEquals(LocalIntent.PrayerTime("maghrib", true), p("فاضل قد ايه على المغرب"))
+        assertEquals(LocalIntent.Habit("reading", 5.0, "pages"), p("قريت 5 صفحات"))
+        assertEquals(LocalIntent.Habit("study", 120.0, "minutes"), p("ذاكرت ساعتين"))
+        assertEquals(LocalIntent.Habit("water", 2.0, "cups"), p("شربت كوبايتين مية"))
+        assertEquals(LocalIntent.Silent(true), p("اعمل الموبايل صامت"))
+        assertEquals(LocalIntent.Silent(false), p("شيل الصامت"))
     }
 
     @Test fun questions() {

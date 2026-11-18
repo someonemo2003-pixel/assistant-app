@@ -108,11 +108,14 @@ object PlaceTracker {
             .filter { (p, d) -> d <= p.radius + minOf(accuracy, 60f) }
             .minByOrNull { it.second }?.first
 
-    /** Called with each location fix (about every 5 minutes). */
+    /** Called with each location fix (every 5 min by day, 30 min early morning, 1 h at night). */
     @Synchronized
     fun onFix(ctx: Context, lat: Double, lng: Double, accuracy: Float, t: Long = System.currentTimeMillis()) {
         if (accuracy > 250f) return // too vague to say anything
         val p = prefs(ctx)
+        // remember the last two fixes (for "is the user driving?")
+        p.edit().putFloat("pLat", p.getFloat("lLat", lat.toFloat())).putFloat("pLng", p.getFloat("lLng", lng.toFloat()))
+            .putLong("pT", p.getLong("lT", t)).putFloat("lLat", lat.toFloat()).putFloat("lLng", lng.toFloat()).putLong("lT", t).apply()
         val store = VisitStore.get(ctx)
 
         // Are we staying still? Keep an anchor; it moves when we're > SAME_SPOT_M away from it.
@@ -143,6 +146,30 @@ object PlaceTracker {
             t - since >= STAY_MS -> store.start(null, aLat, aLng, since)
         }
     }
+
+    /** Last known position from tracking (or null). */
+    fun lastFix(ctx: Context): Pair<Double, Double>? {
+        val p = prefs(ctx)
+        val lat = p.getFloat("lLat", Float.NaN)
+        return if (lat.isNaN()) null else lat.toDouble() to p.getFloat("lLng", 0f).toDouble()
+    }
+
+    /** Moving faster than ~20 km/h between the last two fixes (taken within the last 10 minutes)? */
+    fun movingFast(ctx: Context, speedMps: Float? = null): Boolean {
+        if (speedMps != null && speedMps > 5.5f) return true
+        val p = prefs(ctx)
+        val lT = p.getLong("lT", 0); val pT = p.getLong("pT", 0)
+        if (System.currentTimeMillis() - lT > 10 * 60_000L || lT - pT < 30_000L) return false
+        val d = dist(p.getFloat("pLat", 0f).toDouble(), p.getFloat("pLng", 0f).toDouble(), p.getFloat("lLat", 0f).toDouble(), p.getFloat("lLng", 0f).toDouble())
+        return d / ((lT - pT) / 1000f) > 5.5f
+    }
+
+    fun isMosque(name: String?) = name != null && listOf("جامع", "مسجد", "mosque", "masjid").any { name.contains(it, true) }
+
+    /** The saved place the user is at right now (from tracking), if any. */
+    fun currentPlace(ctx: Context): String? = VisitStore.get(ctx).open()?.takeIf {
+        System.currentTimeMillis() - it.last < 20 * 60_000L
+    }?.place
 
     /** Names a spot: "سجل المكان ده باسم X". Also renames today's visit if we're there now. */
     fun savePlace(ctx: Context, name: String, lat: Double, lng: Double, radius: Int) {
@@ -198,36 +225,71 @@ object PlaceTracker {
     }
 }
 
-/** Runs all day: a location fix about every 5 minutes, balanced power (Wi-Fi/cell, GPS only when needed). */
+/** Runs all day, balanced power (Wi-Fi/cell, GPS only when needed): every hour at night, 30 min in the early morning, 5 min the rest of the day. */
 class PlaceService : Service(), LocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
     private var started = false
 
-    @SuppressLint("MissingPermission")
+    private val handler by lazy { android.os.Handler(Looper.getMainLooper()) }
+    private val reschedule = Runnable { requestUpdates() }
+    private var currentEvery = 0L
+    private var unlockWatcher: android.content.BroadcastReceiver? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
         runCatching { ServiceCompat.startForeground(this, NOTE_ID, note(), type) }.onFailure { stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_RATE) { started = true; requestUpdates(); return START_STICKY }
         if (started) return START_STICKY
         started = true
-        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val every = 5 * 60_000L
-        val providers = buildList {
-            if (Build.VERSION.SDK_INT >= 31 && runCatching { lm.isProviderEnabled(LocationManager.FUSED_PROVIDER) }.getOrDefault(false)) add(LocationManager.FUSED_PROVIDER)
-            else add(LocationManager.NETWORK_PROVIDER)
-            add(LocationManager.PASSIVE_PROVIDER) // free fixes other apps already asked for
+        requestUpdates()
+        unlockWatcher = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                Thread {
+                    runCatching { com.myassistant.app.prayer.Prayers.onUserPresent(applicationContext) }
+                    runCatching { com.myassistant.app.reading.Reading.onUnlock(applicationContext) }
+                }.start()
+            }
         }
-        for (pv in providers) runCatching {
-            lm.requestLocationUpdates(pv, if (pv == LocationManager.PASSIVE_PROVIDER) 60_000L else every, 0f, this, Looper.getMainLooper())
-        }
+        runCatching { ContextCompat.registerReceiver(this, unlockWatcher, android.content.IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_EXPORTED) }
         return START_STICKY
     }
 
+    /** (Re)asks for fixes at the rate for this time of day, and again when the next period starts. */
+    @SuppressLint("MissingPermission")
+    private fun requestUpdates() {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        runCatching { lm.removeUpdates(this) }
+        val every = intervalNow()
+        currentEvery = every
+        val main = if (Build.VERSION.SDK_INT >= 31 && runCatching { lm.isProviderEnabled(LocationManager.FUSED_PROVIDER) }.getOrDefault(false))
+            LocationManager.FUSED_PROVIDER else LocationManager.NETWORK_PROVIDER
+        runCatching { lm.requestLocationUpdates(main, every, 0f, this, Looper.getMainLooper()) }
+        // Free fixes other apps already asked for — only in the daytime period, so nights stay quiet.
+        if (every <= 5 * 60_000L) runCatching { lm.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 60_000L, 0f, this, Looper.getMainLooper()) }
+        // Switch rate at 7 AM / 10 AM / midnight. An alarm wakes us even in deep sleep (the handler is a backup).
+        handler.removeCallbacks(reschedule)
+        handler.postDelayed(reschedule, msToNextPeriod() + 5_000L)
+        runCatching {
+            val am = getSystemService(android.app.AlarmManager::class.java)
+            val pi = android.app.PendingIntent.getForegroundService(
+                this, 6162, Intent(this, PlaceService::class.java).setAction(ACTION_RATE),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val at = System.currentTimeMillis() + msToNextPeriod() + 5_000L
+            if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, at, pi)
+            else am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, at, pi)
+        }
+    }
+
     override fun onLocationChanged(loc: Location) {
+        if (intervalNow() != currentEvery) handler.post { requestUpdates() } // the rate period changed while asleep
         val acc = if (loc.hasAccuracy()) loc.accuracy else 100f
         Thread { runCatching { PlaceTracker.onFix(applicationContext, loc.latitude, loc.longitude, acc, loc.time.takeIf { it > 0 } ?: System.currentTimeMillis()) } }.start()
     }
 
     override fun onDestroy() {
+        unlockWatcher?.let { runCatching { unregisterReceiver(it) } }
+        handler.removeCallbacks(reschedule)
         runCatching { (getSystemService(Context.LOCATION_SERVICE) as LocationManager).removeUpdates(this) }
         super.onDestroy()
     }
@@ -249,5 +311,30 @@ class PlaceService : Service(), LocationListener {
     companion object {
         private const val CHANNEL = "nova_bg"
         private const val NOTE_ID = 6161
+        private const val ACTION_RATE = "rate"
+
+        /** 12 AM–7 AM: every hour · 7–10 AM: every 30 min · 10 AM–12 AM: every 5 min. */
+        fun intervalAt(hour: Int): Long = when (hour) {
+            in 0 until 7 -> 60 * 60_000L
+            in 7 until 10 -> 30 * 60_000L
+            else -> 5 * 60_000L
+        }
+
+        fun intervalNow(): Long = intervalAt(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY))
+
+        /** Milliseconds until the next change of rate (7 AM, 10 AM or midnight). */
+        fun msToNextPeriod(): Long {
+            val now = java.util.Calendar.getInstance()
+            val h = now.get(java.util.Calendar.HOUR_OF_DAY)
+            val next = (now.clone() as java.util.Calendar).apply {
+                set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+                when {
+                    h < 7 -> set(java.util.Calendar.HOUR_OF_DAY, 7)
+                    h < 10 -> set(java.util.Calendar.HOUR_OF_DAY, 10)
+                    else -> { set(java.util.Calendar.HOUR_OF_DAY, 0); add(java.util.Calendar.DAY_OF_MONTH, 1) }
+                }
+            }
+            return (next.timeInMillis - now.timeInMillis).coerceAtLeast(60_000L)
+        }
     }
 }
