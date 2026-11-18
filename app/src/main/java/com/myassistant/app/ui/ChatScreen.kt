@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
@@ -534,137 +536,50 @@ private fun RoundButton(onClick: () -> Unit, content: @Composable () -> Unit) {
     ) { content() }
 }
 
-/** A small animated glass-like orb with orbiting 3D rings; it reacts to the voice level. */
+/**
+ * Nova's logo: a real full moon (NASA LRO photo map, public domain) with a warm glow that breathes,
+ * and grows with the voice. Only the glow moves, in the draw/layer phase, so it stays smooth.
+ */
 @Composable
 fun NovaRing(size: androidx.compose.ui.unit.Dp, active: Boolean, level: Float = 0f, modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "orb")
-    val breathe by t.animateFloat(
-        initialValue = 0.97f, targetValue = 1.025f,
-        animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "breathe",
+    val t = rememberInfiniteTransition(label = "moon")
+    val breathe = t.animateFloat(
+        initialValue = 0.0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3600, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "breathe",
     )
-    val orbit by t.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            tween(if (active) 6500 else 36000, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "orbit",
-    )
-    val voice by androidx.compose.animation.core.animateFloatAsState(level.coerceIn(0f, 1f), label = "voice")
-    val scale = if (active) 1f + voice * 0.08f else breathe
-    val glow by androidx.compose.animation.core.animateFloatAsState(if (active) 1f else 0.82f, label = "glow")
-    Box(
-        modifier.size(size).graphicsLayer { scaleX = scale; scaleY = scale },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val cx = this.size.width / 2f
-            val cy = this.size.height / 2f
-            val unit = this.size.minDimension
-            val radius = unit * 0.265f
-            val radians = Math.PI.toFloat() / 180f
-
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        NovaViolet.copy(alpha = glow * 0.58f),
-                        NovaViolet.copy(alpha = glow * 0.24f),
-                        Color.Transparent,
-                    ),
-                    center = Offset(cx, cy),
-                    radius = unit * 0.62f,
-                ),
-                radius = unit * 0.62f,
-                center = Offset(cx, cy),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(NovaCyan.copy(alpha = glow * 0.26f), Color.Transparent),
-                    center = Offset(cx - radius * 0.38f, cy + radius * 0.12f),
-                    radius = radius * 1.65f,
-                ),
-                radius = radius * 1.65f,
-                center = Offset(cx - radius * 0.38f, cy + radius * 0.12f),
-            )
-
-            fun orbitPath(
-                foreground: Boolean,
-                orbitScale: Float,
-                tilt: Float,
-                inclination: Float,
-                phase: Float,
-                tint: Color,
-            ) {
-                val steps = 160
-                var segment: Path? = null
-                for (i in 0..steps) {
-                    val angle = (i.toFloat() / steps * 360f + orbit + phase) * radians
-                    val depth = sin(angle) * sin(inclination)
-                    val isForeground = depth >= 0f
-                    val x = cx + cos(angle) * radius * orbitScale
-                    val y = cy + sin(angle) * radius * orbitScale * tilt
-                    if (isForeground == foreground) {
-                        val path = segment
-                        if (path == null) {
-                            segment = Path().apply { moveTo(x, y) }
-                        } else {
-                            path.lineTo(x, y)
-                        }
-                    } else {
-                        segment?.let {
-                            drawPath(
-                                it,
-                                tint.copy(alpha = if (foreground) 0.82f else 0.30f),
-                                style = Stroke(width = unit * 0.012f),
-                            )
-                        }
-                        segment = null
-                    }
+    val voice = androidx.compose.animation.core.animateFloatAsState(level.coerceIn(0f, 1f), label = "voice")
+    val on = androidx.compose.animation.core.animateFloatAsState(if (active) 1f else 0f, label = "active")
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        // Warm moonlight around it.
+        Box(
+            Modifier.fillMaxSize()
+                .graphicsLayer {
+                    val g = 0.55f + breathe.value * 0.25f + on.value * 0.15f + voice.value * 0.35f
+                    alpha = g.coerceAtMost(1f)
+                    val s = 1f + breathe.value * 0.02f + voice.value * 0.12f
+                    scaleX = s; scaleY = s
                 }
-                segment?.let {
-                    drawPath(
-                        it,
-                        tint.copy(alpha = if (foreground) 0.82f else 0.30f),
-                        style = Stroke(width = unit * 0.012f),
+                .drawWithCache {
+                    // Light that comes out of the moon's own edge (the moon covers the inner part) and fades out.
+                    val glow = Brush.radialGradient(
+                        0.00f to Color(0xFFFFE8C2).copy(alpha = 0.70f),
+                        0.66f to Color(0xFFFFE8C2).copy(alpha = 0.70f),
+                        0.72f to Color(0xFFFFDDB0).copy(alpha = 0.42f),
+                        0.82f to Color(0xFFFFD39C).copy(alpha = 0.14f),
+                        1.00f to Color.Transparent,
                     )
-                }
-            }
-
-            val rings = listOf(
-                Triple(1.72f, 0.40f, 0.92f) to NovaViolet,
-                Triple(1.48f, 0.68f, 0.54f) to NovaCyan,
-            )
-            rings.forEach { (geometry, tint) ->
-                orbitPath(false, geometry.first, geometry.second, geometry.third, 0f, tint)
-            }
-
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFE0D9FF), Color(0xFF887BD2), Color(0xFF454467), Color(0xFF1D202B)),
-                    center = Offset(cx - radius * 0.36f, cy - radius * 0.42f),
-                    radius = radius * 1.95f,
-                ),
-                radius = radius,
-                center = Offset(cx, cy),
-            )
-            val glintAngle = orbit * radians
-            val glintCenter = Offset(
-                cx - radius * 0.40f + cos(glintAngle) * radius * 0.10f,
-                cy - radius * 0.43f + sin(glintAngle) * radius * 0.08f,
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.92f), NovaViolet.copy(alpha = 0.32f), Color.Transparent),
-                    center = glintCenter,
-                    radius = radius * 0.82f,
-                ),
-                radius = radius * 0.82f,
-                center = glintCenter,
-            )
-
-            rings.forEach { (geometry, tint) ->
-                orbitPath(true, geometry.first, geometry.second, geometry.third, 0f, tint)
-            }
-        }
+                    onDrawBehind { drawCircle(glow) }
+                },
+        )
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(com.myassistant.app.R.drawable.nova_moon),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(0.68f).graphicsLayer {
+                val s = 1f + voice.value * 0.04f
+                scaleX = s; scaleY = s
+            },
+        )
     }
 }
 
@@ -758,23 +673,32 @@ private fun ModelPicker(vm: AppViewModel, providers: List<com.myassistant.app.ai
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
             )
-            ModelSection("يرد عليا", providers, sChat, dChat) { pick(true, it) }
-            ModelSection("ينفّذ الأوامر على الموبايل", providers, sAction, dAction) { pick(false, it) }
-            OpenCodeSection(vm, asDefault)
-            Row(
-                Modifier.fillMaxWidth().padding(top = 14.dp).clickable { asDefault = !asDefault },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                androidx.compose.material3.Checkbox(checked = asDefault, onCheckedChange = { asDefault = it })
-                Text("خلّي اختياري الافتراضي لكل المحادثات", style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface)
+            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.FilterChip(
+                    selected = !asDefault, onClick = { asDefault = false },
+                    label = { Text("للمحادثة دي بس") },
+                )
+                androidx.compose.material3.FilterChip(
+                    selected = asDefault, onClick = { asDefault = true },
+                    label = { Text("الافتراضي دايمًا") },
+                )
             }
+            Text(
+                "أو دوس دوسة طويلة على أي موديل يبقى الافتراضي.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ModelSection("يرد عليا", providers, sChat, dChat, onDefault = { s.setChatBrain(it); s.sessionChat.value = "" }) { pick(true, it) }
+            ModelSection("ينفّذ الأوامر على الموبايل", providers, sAction, dAction,
+                onDefault = { s.setActionBrain(it); s.sessionAction.value = "" }) { pick(false, it) }
+            OpenCodeSection(vm, asDefault)
             if (providers.isEmpty()) Text("مفيش مزوّدين جاهزين. قول لـ Nova: عايز أضيف مزوّد.", color = MaterialTheme.colorScheme.error)
         }
     }
 }
 
 /** OpenCode's models (the coding agent in Termux): pick one for this chat or as the default. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     val s = vm.settings
@@ -811,10 +735,10 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     shown.forEach { id ->
         val on = id == current
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            Modifier.padding(vertical = 5.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
                 .background(if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
                 .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
-                .clickable { pick(id) }
+                .combinedClickable(onClick = { pick(id) }, onLongClick = { s.setOpencodeModel(id); s.sessionOpencode.value = "" })
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -831,12 +755,14 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ModelSection(
     title: String,
     providers: List<com.myassistant.app.ai.ProviderConfig>,
     selected: String,
     default: String,
+    onDefault: (String) -> Unit,
     onPick: (String) -> Unit,
 ) {
     Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
@@ -844,10 +770,10 @@ private fun ModelSection(
     providers.forEach { c ->
         val on = (selected.ifEmpty { default }) == c.id
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            Modifier.padding(vertical = 5.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
                 .background(if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
                 .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
-                .clickable { onPick(c.id) }
+                .combinedClickable(onClick = { onPick(c.id) }, onLongClick = { onDefault(c.id) })
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
