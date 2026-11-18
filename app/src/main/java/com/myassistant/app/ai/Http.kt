@@ -36,6 +36,8 @@ object Http {
         .connectTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
+        // Whole request at most 100 s: a provider that hangs must not block Nova for minutes.
+        .callTimeout(100, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
 
@@ -69,6 +71,8 @@ object Http {
             val (code, text) = try {
                 execute(client, build())
             } catch (first: IOException) {
+                // A slow provider: don't wait all over again, let the next provider answer.
+                if (first is java.io.InterruptedIOException) throw ProviderException("تعذّر الاتصال: ${describe(first)}")
                 // One more try with the most compatible connection settings.
                 try {
                     execute(fallbackClient, build())

@@ -77,6 +77,7 @@ class OpenCodePlanTool : Tool {
             AgentStatus.set("OpenCode بيجهّز الخطة… ${s}ث")
         }
         OpenCode.lastPlan = r.out.takeLast(4000)
+        OpenCode.lastPlanAt = if (r.code == 0 && r.out.isNotBlank()) System.currentTimeMillis() else 0L
         return "PLAN (nothing was changed yet):\n" + r.text(8000)
     }
 }
@@ -140,6 +141,11 @@ class OpenCodeModelsTool : Tool {
 /** Runs OpenCode inside the Ubuntu (proot-distro) that lives in Termux. */
 object OpenCode {
     @Volatile var lastPlan: String = ""
+    /** When the last plan was made (0 = none / failed / already carried out). */
+    @Volatile var lastPlanAt: Long = 0L
+
+    /** A plan made in the last 30 minutes that hasn't been carried out yet. */
+    fun hasFreshPlan() = lastPlanAt > 0 && System.currentTimeMillis() - lastPlanAt < 30 * 60_000
 
     // Nova's own OpenCode settings for ~/work: nothing ever waits for a yes/no that nobody can see
     // (in the background a question would hang forever). Plan mode may only look; everything else is refused.

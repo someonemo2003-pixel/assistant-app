@@ -70,6 +70,26 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val intent = FastParser.parse(text)
             ?: return fromExperience(text, userOnly = false) ?: fromTemplate(text) ?: fromMeaning(text)
         return when (intent) {
+            is LocalIntent.OpenCodeTask -> {
+                val tool = tools["opencode_plan"] ?: return null
+                val args = JSONObject().put("task", intent.task)
+                val r = tool.execute(args, ctx)
+                val plan = r.removePrefix("PLAN (nothing was changed yet):").trim()
+                val failed = com.myassistant.app.terminal.OpenCode.lastPlanAt == 0L
+                actionMessages(
+                    "opencode_plan", args, r,
+                    if (failed) "OpenCode مقدرش يعمل خطة:\n$plan"
+                    else "خطة OpenCode (لسه ماتغيّرش حاجة):\n\n$plan\n\nقول «نفّذ» علشان يبدأ، أو اكتبله تعديلك.",
+                )
+            }
+            is LocalIntent.OpenCodeGo -> {
+                if (!com.myassistant.app.terminal.OpenCode.hasFreshPlan()) return null
+                val tool = tools["opencode_do"] ?: return null
+                val args = JSONObject().put("summary", "الخطة اللي OpenCode عملها")
+                val r = tool.execute(args, ctx)
+                com.myassistant.app.terminal.OpenCode.lastPlanAt = 0L
+                actionMessages("opencode_do", args, r, "OpenCode خلّص:\n\n" + r.substringAfter('\n').trim().takeLast(3000))
+            }
             is LocalIntent.AboutMe -> {
                 val items = withContext(Dispatchers.IO) { ctx.memory.recent(2000) }
                 listOf(reply(if (items.isEmpty()) "لسه معرفش عنك حاجة. احكيلي عن نفسك وأنا هفتكر." else aboutMe(items)))

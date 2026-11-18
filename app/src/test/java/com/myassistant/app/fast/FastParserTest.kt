@@ -101,4 +101,13 @@ class FastParserTest {
         assertEquals(LocalIntent.AboutMe, FastParser.parse("what do you know about me"))
         assertTrue(FastParser.parse("افتكر إن عيد ميلادي 5 مايو") is LocalIntent.Remember)
     }
+
+    @Test fun openCode() {
+        assertEquals(LocalIntent.OpenCodeTask("يعمل script بايثون يطبع التاريخ"), FastParser.parse("خلّي OpenCode يعمل script بايثون يطبع التاريخ"))
+        assertEquals(LocalIntent.OpenCodeTask("قولي إصدار بايثون"), FastParser.parse("opencode: قولي إصدار بايثون"))
+        assertEquals(LocalIntent.OpenCodeTask("اعمل موقع بسيط"), FastParser.parse("اطلب من opencode اعمل موقع بسيط"))
+        assertNull(FastParser.parse("opencode بطيء ليه؟"))
+        assertEquals(LocalIntent.OpenCodeGo, FastParser.parse("نفّذ"))
+        assertEquals(LocalIntent.OpenCodeGo, FastParser.parse("كمل ونفذ"))
+    }
 }

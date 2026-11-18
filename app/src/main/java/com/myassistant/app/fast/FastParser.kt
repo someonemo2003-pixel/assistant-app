@@ -31,13 +31,25 @@ sealed interface LocalIntent {
     data object AskDate : LocalIntent
     /** "تعرف ايه عني؟" — answered straight from memory, no AI call. */
     data object AboutMe : LocalIntent
+    /** "خلّي OpenCode يعمل …" — sent straight to OpenCode, no AI model in between. */
+    data class OpenCodeTask(val task: String) : LocalIntent
+    /** "نفّذ" right after an OpenCode plan. */
+    data object OpenCodeGo : LocalIntent
 }
 
 object FastParser {
 
     fun parse(raw: String): LocalIntent? {
         val original = raw.trim()
+        // OpenCode requests can be long: check them before the length limit.
+        openCodeRegex.find(original)?.takeIf { m ->
+            m.groupValues[1].contains("code", true) || Regex("""^\s*\S+(?:\s+(?:من|ل|لـ))?\s+open\s?code\b""", RegexOption.IGNORE_CASE).containsMatchIn(original)
+        }?.let { m ->
+            val task = m.groupValues[2].trim().trimStart(',', '،', ':', '-').trim()
+            if (task.length >= 3) return LocalIntent.OpenCodeTask(task)
+        }
         if (original.isEmpty() || original.length > 80) return null
+        if (normalize(original).trimEnd('.', '!', '؟', '?') in goWords) return LocalIntent.OpenCodeGo
         val t = normalize(original)
         val words = t.split(' ').filter { it.isNotEmpty() }
 
@@ -248,6 +260,17 @@ object FastParser {
         }
         return sb.toString().replace(Regex("\\s+"), " ").trim().trimEnd('.')
     }
+
+    /** "خلّي OpenCode …" / "اطلب من OpenCode …" / "OpenCode: …" — group 2 is the task. */
+    private val openCodeRegex = Regex(
+        """^\s*(خل[ّ]?ي|خللي|اطلب من|قول ل|قول لـ|ابعت ل|ابعت لـ|ask|let|have|open\s?code\s*:)\s*(?:open\s?code\b)?[\s:،,]*(.+)$""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+    )
+
+    private val goWords = setOf(
+        "نفذ", "نفذها", "نفذ الخطه", "نفذ الخطه دي", "اه نفذ", "ايوه نفذ", "تمام نفذ", "كمل", "كمل ونفذ", "ابدا", "يلا نفذ",
+        "go", "go ahead", "do it",
+    )
 
     private val aboutMeVerbs = setOf(
         "تعرف", "عارف", "تعرفه", "تعرفي", "فاكر", "فاكره", "مسجل", "حافظ", "متسجل", "عندك", "تفتكر",
