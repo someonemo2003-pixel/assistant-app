@@ -205,17 +205,17 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val (exp, argsJson) = candidates.firstOrNull() ?: return null
         // two different learned actions fit → not sure, let the big brain decide
         if (candidates.drop(1).any { it.first.tool != exp.tool }) return null
-        return replay(exp, argsJson, "template")
+        return replay(exp, argsJson, "template", text)
     }
 
     /** Same request said differently: matched by the on-device meaning model. Never replays with a different name/number. */
     private suspend fun fromMeaning(text: String): List<ChatMessage>? {
         val exp = ctx.recall.similarExperience(text) ?: return null
         val argsJson = Templates.adapt(exp.phrase, exp.args, text, requireChange = false) ?: return null
-        return replay(exp, argsJson, "meaning")
+        return replay(exp, argsJson, "meaning", text)
     }
 
-    private suspend fun replay(exp: Experience, argsJson: String, how: String): List<ChatMessage>? {
+    private suspend fun replay(exp: Experience, argsJson: String, how: String, text: String): List<ChatMessage>? {
         val tool = tools[exp.tool]?.takeIf { it.learnable } ?: return null
         val args = runCatching { JSONObject(argsJson) }.getOrNull() ?: return null
         val result = tool.execute(args, ctx)
