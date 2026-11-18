@@ -29,6 +29,8 @@ sealed interface LocalIntent {
     data object CheckUpdate : LocalIntent
     data object AskTime : LocalIntent
     data object AskDate : LocalIntent
+    /** "تعرف ايه عني؟" — answered straight from memory, no AI call. */
+    data object AboutMe : LocalIntent
 }
 
 object FastParser {
@@ -67,6 +69,11 @@ object FastParser {
         if (hasAny(t, "البطاريه كام", "كام البطاريه", "الشحن كام", "كام الشحن", "البطاريه فيها كام", "battery")) return LocalIntent.Battery
         if (hasAny(t, "اقفل الشاشه", "قفل الشاشه", "اقفل الموبايل", "lock screen")) return LocalIntent.LockPhone
         if (hasAny(t, "فيه تحديث", "في تحديث", "حدث نفسك", "اخر نسخه", "شوف التحديث", "دور علي تحديث", "check update")) return LocalIntent.CheckUpdate
+
+        // "What do you know about me?" (before remember, which also matches "فاكر").
+        if ((words.any { it == "عني" || it == "عنى" } && words.any { it in aboutMeVerbs }) ||
+            hasAny(t, "about me", "اعرفه عني", "تعرفه عني")
+        ) return LocalIntent.AboutMe
 
         // Remember: keep the user's own wording for the fact.
         rememberRegex.find(original)?.let { m ->
@@ -241,6 +248,10 @@ object FastParser {
         }
         return sb.toString().replace(Regex("\\s+"), " ").trim().trimEnd('.')
     }
+
+    private val aboutMeVerbs = setOf(
+        "تعرف", "عارف", "تعرفه", "تعرفي", "فاكر", "فاكره", "مسجل", "حافظ", "متسجل", "عندك", "تفتكر",
+    )
 
     private fun hasAny(t: String, vararg parts: String) = parts.any { t.contains(it) }
 

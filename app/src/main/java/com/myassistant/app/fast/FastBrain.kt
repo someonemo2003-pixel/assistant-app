@@ -70,6 +70,10 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val intent = FastParser.parse(text)
             ?: return fromExperience(text, userOnly = false) ?: fromTemplate(text) ?: fromMeaning(text)
         return when (intent) {
+            is LocalIntent.AboutMe -> {
+                val items = withContext(Dispatchers.IO) { ctx.memory.recent(2000) }
+                listOf(reply(if (items.isEmpty()) "لسه معرفش عنك حاجة. احكيلي عن نفسك وأنا هفتكر." else aboutMe(items)))
+            }
             is LocalIntent.AskTime -> listOf(reply("الساعة دلوقتي ${clock(nowHour(), nowMinute())}"))
             is LocalIntent.AskDate -> listOf(reply("النهارده ${SimpleDateFormat("EEEE d MMMM yyyy", Locale("ar", "EG")).format(Date())}"))
             is LocalIntent.Alarm -> run(
@@ -287,6 +291,23 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
             ChatMessage(role = Role.TOOL, text = result, toolCallId = call.id, toolName = toolName),
             reply(text),
         )
+    }
+
+    /** What Nova remembers, grouped by folder (newest first, a few per folder). */
+    private fun aboutMe(items: List<com.myassistant.app.memory.MemoryItem>): String {
+        val cats = com.myassistant.app.memory.MemoryCategories
+        val byCat = items.groupBy { cats.normalize(it.category) }
+        return buildString {
+            append("ده اللي أعرفه عنك (").append(items.size).append(" حاجة):")
+            for (key in cats.all.keys) {
+                val list = byCat[key] ?: continue
+                val label = cats.label(key).substringAfter(' ')
+                append("\n\n").append(label).append(":")
+                list.take(8).forEach { append("\n• ").append(it.text) }
+                if (list.size > 8) append("\n… و").append(list.size - 8).append(" كمان")
+            }
+            append("\n\nعايز تعدّل أو تمسح حاجة؟ قولّي.")
+        }
     }
 
     private fun reply(text: String) = ChatMessage(role = Role.ASSISTANT, text = text, providerName = NAME)

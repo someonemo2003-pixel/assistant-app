@@ -8,6 +8,7 @@ import com.myassistant.app.fast.LocalIntent.Remember
 import com.myassistant.app.fast.LocalIntent.Timer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FastParserTest {
@@ -91,5 +92,13 @@ class FastParserTest {
         assertNull(p("صحيني 7 وافتح يوتيوب"))
         assertNull(p("صحيني"))
         assertNull(p("ايه احسن مطعم في المعادي"))
+    }
+
+    @Test fun aboutMe() {
+        assertEquals(LocalIntent.AboutMe, FastParser.parse("تعرف ايه عني"))
+        assertEquals(LocalIntent.AboutMe, FastParser.parse("انت عارف عني ايه؟"))
+        assertEquals(LocalIntent.AboutMe, FastParser.parse("إيه اللي تعرفه عني"))
+        assertEquals(LocalIntent.AboutMe, FastParser.parse("what do you know about me"))
+        assertTrue(FastParser.parse("افتكر إن عيد ميلادي 5 مايو") is LocalIntent.Remember)
     }
 }
