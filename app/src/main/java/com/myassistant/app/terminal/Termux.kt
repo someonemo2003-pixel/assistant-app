@@ -17,10 +17,10 @@ import androidx.core.content.ContextCompat
 import com.myassistant.app.MainActivity
 import com.myassistant.app.admin.DeviceOwner
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -83,6 +83,7 @@ object Termux {
      * Runs [script] with bash in Termux. Extra [args] reach the script as $1, $2… (no quoting problems).
      * [onTick] is called every few seconds with the elapsed seconds.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun run(
         ctx: Context,
         script: String,
@@ -113,29 +114,39 @@ object Termux {
             waiting.remove(id)
             return Result("", "", -1, "Couldn't reach Termux: ${started.exceptionOrNull()?.message}. Open Termux once and check allow-external-apps = true.")
         }
+        // Keep the CPU awake while the job runs: with the screen off the phone would sleep and the job
+        // (and our time limit) would just freeze.
+        val wake = (ctx.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "nova:terminal")
+            .apply { setReferenceCounted(false); acquire((timeoutSec + 90) * 1000L) }
         var hot = false
-        val res = coroutineScope {
-            val watch = launch {
-                var secs = 0
-                while (true) {
-                    delay(5_000); secs += 5
-                    onTick(secs)
-                    if (temperature(ctx) >= MAX_TEMP_C) {
-                        hot = true
-                        stop(ctx, tag)
-                        break
+        var late = false
+        try {
+            coroutineScope {
+                val t0 = android.os.SystemClock.elapsedRealtime() // real time, keeps counting in deep sleep
+                val deadline = t0 + (timeoutSec + 40) * 1000L
+                val watch = launch {
+                    while (true) {
+                        delay(3_000)
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        onTick(((now - t0) / 1000).toInt())
+                        if (temperature(ctx) >= MAX_TEMP_C) { hot = true; break }
+                        if (now > deadline) { late = true; break }
                     }
+                    stop(ctx, tag)
+                    done.complete(Result("", "", -1, null))
                 }
+                done.await()
+                watch.cancel()
             }
-            val r = withTimeoutOrNull((timeoutSec + 40) * 1000L) { done.await() }
-            watch.cancel()
-            r
+        } finally {
+            // Stopped from the app (the stop button) before Termux answered: stop the job there too.
+            if (!done.isCompleted) { stop(ctx, tag); waiting.remove(id) }
+            if (wake.isHeld) wake.release()
         }
+        val res = done.getCompleted()
         waiting.remove(id)
-        return when {
-            res == null -> { stop(ctx, tag); Result("", "", -1, null, stoppedHot = hot, timedOut = !hot) }
-            else -> res.copy(stoppedHot = hot, timedOut = res.code == 124 || res.code == 137)
-        }
+        return res.copy(stoppedHot = hot, timedOut = late || res.code == 124 || res.code == 137)
     }
 
     /** Stops a running job (and what it started) by its tag. */

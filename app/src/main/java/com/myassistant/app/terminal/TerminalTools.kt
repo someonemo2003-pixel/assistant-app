@@ -141,13 +141,20 @@ class OpenCodeModelsTool : Tool {
 object OpenCode {
     @Volatile var lastPlan: String = ""
 
-    // $1 task, $2 flags, $3 folder, $4 script that runs inside Ubuntu.
+    // Nova's own OpenCode settings for ~/work: nothing ever waits for a yes/no that nobody can see
+    // (in the background a question would hang forever). Plan mode may only look; everything else is refused.
+    private const val CONFIG = "{\"\$schema\":\"https://opencode.ai/config.json\",\"permission\":{\"edit\":\"allow\",\"webfetch\":\"allow\",\"bash\":{\"*\":\"allow\",\"su *\":\"deny\",\"sudo *\":\"deny\",\"tsu*\":\"deny\",\"*magisk*\":\"deny\"}},\"agent\":{\"plan\":{\"permission\":{\"edit\":\"deny\",\"webfetch\":\"allow\",\"bash\":{\"*\":\"deny\",\"ls*\":\"allow\",\"cat *\":\"allow\",\"head *\":\"allow\",\"tail *\":\"allow\",\"find *\":\"allow\",\"grep *\":\"allow\",\"pwd\":\"allow\",\"which *\":\"allow\",\"wc *\":\"allow\",\"tree*\":\"allow\",\"file *\":\"allow\",\"stat *\":\"allow\",\"git status*\":\"allow\",\"git log*\":\"allow\",\"git diff*\":\"allow\",\"python3 --version\":\"allow\",\"node --version\":\"allow\",\"pip list*\":\"allow\",\"apt list*\":\"allow\",\"dpkg -l*\":\"allow\",\"uname*\":\"allow\",\"df*\":\"allow\",\"du *\":\"allow\"}}}}}"
+
+    // $1 task, $2 flags, $3 folder, $4 script that runs inside Ubuntu, $5 config.
     private const val OUTER =
         "command -v proot-distro >/dev/null || { echo 'proot-distro is not installed in Termux'; exit 3; }; " +
-            "exec proot-distro login ubuntu --shared-tmp -- env TASK=\"\$1\" FLAGS=\"\$2\" DIR=\"\$3\" bash -lc \"\$4\""
+            "exec proot-distro login ubuntu --shared-tmp -- env TASK=\"\$1\" FLAGS=\"\$2\" DIR=\"\$3\" CFG=\"\$5\" bash -lc \"\$4\""
+    // Output also goes to ~/.nova-opencode.log inside Ubuntu, so a stuck job can be looked at.
     private const val INNER =
-        "command -v opencode >/dev/null || { echo 'opencode is not installed inside Ubuntu'; exit 3; }; " +
-            "D=\"\${DIR:-\$HOME/work}\"; mkdir -p \"\$D\" && cd \"\$D\" && opencode run \$FLAGS \"\$TASK\" 2>&1"
+        "set -o pipefail; command -v opencode >/dev/null || { echo 'opencode is not installed inside Ubuntu'; exit 3; }; " +
+            "D=\"\${DIR:-\$HOME/work}\"; mkdir -p \"\$D\" && cd \"\$D\" || exit 3; " +
+            "[ -z \"\$DIR\" ] && printf '%s' \"\$CFG\" > opencode.json; " +
+            "opencode run \$FLAGS \"\$TASK\" < /dev/null 2>&1 | tee \"\$HOME/.nova-opencode.log\""
 
     private const val MODELS =
         "exec proot-distro login ubuntu -- bash -lc 'opencode models 2>/dev/null'"
@@ -167,6 +174,6 @@ object OpenCode {
             if (model.isNotBlank() && Regex("""^[A-Za-z0-9._/:-]+$""").matches(model)) { add("-m"); add(model) }
         }.joinToString(" ")
         val dir = folder.takeIf { Regex("""^[A-Za-z0-9._/~ -]+$""").matches(it) }?.replace("~", "/root").orEmpty()
-        return Termux.run(ctx, OUTER, listOf(task, flags, dir, INNER), timeoutSec = if (plan) 420 else 900, onTick = onTick)
+        return Termux.run(ctx, OUTER, listOf(task, flags, dir, INNER, CONFIG), timeoutSec = if (plan) 420 else 900, onTick = onTick)
     }
 }
