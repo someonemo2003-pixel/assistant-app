@@ -7,13 +7,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,17 +42,15 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -63,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -71,18 +69,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.myassistant.app.core.Role
 import com.myassistant.app.ui.theme.NovaCyan
-import com.myassistant.app.ui.theme.NovaNight
 import com.myassistant.app.ui.theme.NovaPink
 import com.myassistant.app.ui.theme.NovaViolet
 import com.myassistant.app.ui.theme.UserBubble
+import kotlin.math.cos
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,12 +120,12 @@ fun ChatScreen(vm: AppViewModel) {
     val listState = rememberLazyListState()
     LaunchedEffect(vm.messages.size, vm.busy, vm.error) { listState.animateScrollToItem(0) }
 
+    var sendFlashKey by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var pickerOpen by remember { mutableStateOf(false) }
     if (pickerOpen) ModelPicker(vm, configs.filter { it.enabled && vm.providerStore.hasKey(it.id) }) { pickerOpen = false }
 
     Box(Modifier.fillMaxSize()) {
-    NovaBackground()
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
@@ -143,7 +148,20 @@ fun ChatScreen(vm: AppViewModel) {
                                     .background(if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error),
                             )
                         }
-                        Text("$current ▾", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
+                                .clickable { pickerOpen = true }
+                                .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(current, style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                            Icon(Icons.Filled.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp))
+                        }
                     }
                 },
                 actions = {
@@ -190,7 +208,8 @@ fun ChatScreen(vm: AppViewModel) {
                 listening = listen.listening,
                 level = listen.level,
                 speaking = speaking,
-                onSend = { vm.send(input); input = "" },
+                onSend = { vm.send(input); input = ""; sendFlashKey++ },
+                sendFlashKey = sendFlashKey,
                 onStop = { vm.stop() },
                 onMic = { if (listen.listening || speaking) vm.stopVoice() else onMic() },
             )
@@ -209,8 +228,8 @@ fun ChatScreen(vm: AppViewModel) {
                 state = listState,
                 reverseLayout = true,
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 vm.error?.let { err -> item(key = "error") { ErrorCard(err) } }
                 if (vm.busy) item(key = "typing") { WorkingLine() }
@@ -251,12 +270,12 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null, thinking
             bottomStart = if (mine) 22.dp else 6.dp,
             bottomEnd = if (mine) 6.dp else 22.dp,
         )
-        val bg = if (mine) Modifier.background(Brush.linearGradient(listOf(Color(0xFF3B82F6), NovaViolet)), shape)
+        val bg = if (mine) Modifier.background(UserBubble, shape)
         else Modifier
-            .background(Color.White.copy(alpha = 0.06f), shape)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
         Column(
-            Modifier.widthIn(max = 320.dp).clip(shape).then(bg).padding(horizontal = 15.dp, vertical = 11.dp),
+            Modifier.widthIn(max = 340.dp).clip(shape).then(bg).padding(horizontal = 16.dp, vertical = 13.dp),
         ) {
             SelectionContainer {
                 Text(text, style = MaterialTheme.typography.bodyLarge, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface)
@@ -280,9 +299,9 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null, thinking
             if (footer != null) {
                 Text(
                     footer,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.alpha(0.7f).padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 5.dp),
                 )
             }
         }
@@ -384,11 +403,18 @@ private fun WorkingLine() {
 @Composable
 private fun TypingIndicator() {
     val transition = rememberInfiniteTransition(label = "typing")
+    val halo by transition.animateFloat(
+        initialValue = 0.06f,
+        targetValue = 0.18f,
+        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+        label = "thinkingGlow",
+    )
     Row(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f + halo * 0.20f))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = halo), RoundedCornerShape(20.dp))
+            .padding(horizontal = 15.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         repeat(3) { i ->
@@ -402,7 +428,7 @@ private fun TypingIndicator() {
                     .size(8.dp)
                     .alpha(a)
                     .clip(CircleShape)
-                    .background(listOf(NovaCyan, NovaViolet, NovaPink)[i]),
+                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }
@@ -417,9 +443,18 @@ private fun InputBar(
     level: Float,
     speaking: Boolean,
     onSend: () -> Unit,
+    sendFlashKey: Int,
     onStop: () -> Unit,
     onMic: () -> Unit,
 ) {
+    val sendFlash = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(sendFlashKey) {
+        if (sendFlashKey > 0) {
+            sendFlash.snapTo(1f)
+            sendFlash.animateTo(0f, animationSpec = tween(520))
+        }
+    }
+    val sendFlashColor = MaterialTheme.colorScheme.primary
     Row(
         Modifier
             .fillMaxWidth()
@@ -431,19 +466,44 @@ private fun InputBar(
         TextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("اكتب لـ Nova…", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             modifier = Modifier
                 .weight(1f)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp)),
+                .shadow(18.dp, RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(26.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.11f),
+                            Color(0xFF282638).copy(alpha = 0.94f),
+                            Color(0xFF191D28).copy(alpha = 0.92f),
+                        ),
+                    ),
+                )
+                .border(
+                    1.dp,
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.34f), NovaViolet.copy(alpha = 0.48f), Color.White.copy(alpha = 0.12f)),
+                    ),
+                    RoundedCornerShape(26.dp),
+                )
+                .drawBehind {
+                    if (sendFlash.value > 0f) {
+                        drawRoundRect(
+                            color = sendFlashColor.copy(alpha = sendFlash.value * 0.16f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
+                        )
+                    }
+                }
+                .semantics { contentDescription = "اكتب رسالة" },
             shape = RoundedCornerShape(26.dp),
             maxLines = 5,
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
                 disabledIndicatorColor = Color.Transparent,
-                focusedContainerColor = Color.White.copy(alpha = 0.06f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
-                cursorColor = NovaCyan,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                cursorColor = MaterialTheme.colorScheme.primary,
             ),
         )
         Spacer(Modifier.size(10.dp))
@@ -455,7 +515,8 @@ private fun InputBar(
                 size = 54.dp,
                 active = listening || speaking,
                 level = if (listening) level else if (speaking) 0.35f else 0f,
-                modifier = Modifier.clip(CircleShape).clickable(onClick = onMic),
+                modifier = Modifier.clip(CircleShape).clickable(onClick = onMic)
+                    .semantics { contentDescription = "اتكلم مع Nova" },
             )
         }
     }
@@ -467,66 +528,144 @@ private fun RoundButton(onClick: () -> Unit, content: @Composable () -> Unit) {
         Modifier
             .size(54.dp)
             .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(NovaCyan, NovaViolet, NovaPink)))
+            .background(Brush.linearGradient(listOf(NovaViolet, NovaPink)))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
 
-/** The glowing Nova ring: breathes when idle, turns and swells with the voice when active. */
+/** A small animated glass-like orb with orbiting 3D rings; it reacts to the voice level. */
 @Composable
 fun NovaRing(size: androidx.compose.ui.unit.Dp, active: Boolean, level: Float = 0f, modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "ring")
+    val t = rememberInfiniteTransition(label = "orb")
     val breathe by t.animateFloat(
-        initialValue = 0.94f, targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "breathe",
+        initialValue = 0.97f, targetValue = 1.025f,
+        animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Reverse), label = "breathe",
     )
-    val spin by t.animateFloat(
+    val orbit by t.animateFloat(
         initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(if (active) 2600 else 24000, easing = androidx.compose.animation.core.LinearEasing)),
-        label = "spin",
+        animationSpec = infiniteRepeatable(
+            tween(if (active) 6500 else 36000, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "orbit",
     )
     val voice by androidx.compose.animation.core.animateFloatAsState(level.coerceIn(0f, 1f), label = "voice")
-    val scale = if (active) 1f + voice * 0.35f else breathe
-    val glow by androidx.compose.animation.core.animateFloatAsState(if (active) 1f else 0.55f, label = "glow")
-    Box(modifier.size(size), contentAlignment = Alignment.Center) {
-        // soft halo behind the ring
-        Box(
-            Modifier
-                .size(size)
-                .graphicsLayer { scaleX = scale * 1.15f; scaleY = scale * 1.15f; alpha = glow * 0.6f }
-                .background(Brush.radialGradient(listOf(NovaViolet.copy(alpha = 0.55f), Color.Transparent)), CircleShape),
-        )
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(com.myassistant.app.R.drawable.ic_launcher_art),
-            contentDescription = "اتكلم",
-            modifier = Modifier
-                .size(size)
-                .graphicsLayer { scaleX = scale * 1.25f; scaleY = scale * 1.25f; rotationZ = spin; alpha = 0.75f + glow * 0.25f },
-        )
-    }
-}
-
-/** Night sky behind the chat: deep navy with a violet glow on top and a cyan one at the bottom. */
-@Composable
-private fun NovaBackground() {
+    val scale = if (active) 1f + voice * 0.08f else breathe
+    val glow by androidx.compose.animation.core.animateFloatAsState(if (active) 1f else 0.82f, label = "glow")
     Box(
-        Modifier
-            .fillMaxSize()
-            .background(NovaNight)
-            .drawBehind {
-                drawCircle(
-                    Brush.radialGradient(listOf(NovaViolet.copy(alpha = 0.22f), Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, 0f), radius = size.width * 0.9f),
-                    radius = size.width * 0.9f, center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, 0f),
-                )
-                drawCircle(
-                    Brush.radialGradient(listOf(NovaCyan.copy(alpha = 0.10f), Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width, size.height), radius = size.width),
-                    radius = size.width, center = androidx.compose.ui.geometry.Offset(size.width, size.height),
-                )
-            },
-    )
+        modifier.size(size).graphicsLayer { scaleX = scale; scaleY = scale },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val unit = size.minDimension
+            val radius = unit * 0.265f
+            val radians = Math.PI.toFloat() / 180f
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        NovaViolet.copy(alpha = glow * 0.58f),
+                        NovaViolet.copy(alpha = glow * 0.24f),
+                        Color.Transparent,
+                    ),
+                    center = Offset(cx, cy),
+                    radius = unit * 0.62f,
+                ),
+                radius = unit * 0.62f,
+                center = Offset(cx, cy),
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(NovaCyan.copy(alpha = glow * 0.26f), Color.Transparent),
+                    center = Offset(cx - radius * 0.38f, cy + radius * 0.12f),
+                    radius = radius * 1.65f,
+                ),
+                radius = radius * 1.65f,
+                center = Offset(cx - radius * 0.38f, cy + radius * 0.12f),
+            )
+
+            fun orbitPath(
+                foreground: Boolean,
+                orbitScale: Float,
+                tilt: Float,
+                inclination: Float,
+                phase: Float,
+                tint: Color,
+            ) {
+                val steps = 160
+                var segment: Path? = null
+                for (i in 0..steps) {
+                    val angle = (i.toFloat() / steps * 360f + orbit + phase) * radians
+                    val depth = sin(angle) * sin(inclination)
+                    val isForeground = depth >= 0f
+                    val x = cx + cos(angle) * radius * orbitScale
+                    val y = cy + sin(angle) * radius * orbitScale * tilt
+                    if (isForeground == foreground) {
+                        val path = segment
+                        if (path == null) {
+                            segment = Path().apply { moveTo(x, y) }
+                        } else {
+                            path.lineTo(x, y)
+                        }
+                    } else {
+                        segment?.let {
+                            drawPath(
+                                it,
+                                tint.copy(alpha = if (foreground) 0.82f else 0.30f),
+                                style = Stroke(width = unit * 0.012f),
+                            )
+                        }
+                        segment = null
+                    }
+                }
+                segment?.let {
+                    drawPath(
+                        it,
+                        tint.copy(alpha = if (foreground) 0.82f else 0.30f),
+                        style = Stroke(width = unit * 0.012f),
+                    )
+                }
+            }
+
+            val rings = listOf(
+                Triple(1.72f, 0.40f, 0.92f) to NovaViolet,
+                Triple(1.48f, 0.68f, 0.54f) to NovaCyan,
+            )
+            rings.forEach { (geometry, tint) ->
+                orbitPath(false, geometry.first, geometry.second, geometry.third, 0f, tint)
+            }
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFE0D9FF), Color(0xFF887BD2), Color(0xFF454467), Color(0xFF1D202B)),
+                    center = Offset(cx - radius * 0.36f, cy - radius * 0.42f),
+                    radius = radius * 1.95f,
+                ),
+                radius = radius,
+                center = Offset(cx, cy),
+            )
+            val glintAngle = orbit * radians
+            val glintCenter = Offset(
+                cx - radius * 0.40f + cos(glintAngle) * radius * 0.10f,
+                cy - radius * 0.43f + sin(glintAngle) * radius * 0.08f,
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.92f), NovaViolet.copy(alpha = 0.32f), Color.Transparent),
+                    center = glintCenter,
+                    radius = radius * 0.82f,
+                ),
+                radius = radius * 0.82f,
+                center = glintCenter,
+            )
+
+            rings.forEach { (geometry, tint) ->
+                orbitPath(true, geometry.first, geometry.second, geometry.third, 0f, tint)
+            }
+        }
+    }
 }
 
 /** Shows what the assistant is hearing, or that it is talking, with a button to stop. */
@@ -563,7 +702,7 @@ private fun VoiceBar(
     }
 }
 
-/** Empty chat: just the glowing Nova ring, breathing. */
+/** Empty chat: the animated orb becomes the focus without a spinning app icon. */
 @Composable
 private fun EmptyState(
     modifier: Modifier,
@@ -607,8 +746,18 @@ private fun ModelPicker(vm: AppViewModel, providers: List<com.myassistant.app.ai
         }
     }
 
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF0E0C2B)) {
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+            Text("اختيار الموديل", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                "اختار مين يرد، أو مين ينفّذ أوامرك على الموبايل.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            )
             ModelSection("يرد عليا", providers, sChat, dChat) { pick(true, it) }
             ModelSection("ينفّذ الأوامر على الموبايل", providers, sAction, dAction) { pick(false, it) }
             OpenCodeSection(vm, asDefault)
@@ -617,7 +766,8 @@ private fun ModelPicker(vm: AppViewModel, providers: List<com.myassistant.app.ai
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 androidx.compose.material3.Checkbox(checked = asDefault, onCheckedChange = { asDefault = it })
-                Text("خلّي اختياري الافتراضي لكل المحادثات", style = MaterialTheme.typography.bodyMedium)
+                Text("خلّي اختياري الافتراضي لكل المحادثات", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface)
             }
             if (providers.isEmpty()) Text("مفيش مزوّدين جاهزين. قول لـ Nova: عايز أضيف مزوّد.", color = MaterialTheme.colorScheme.error)
         }
@@ -636,7 +786,7 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     fun pick(id: String) { if (asDefault) { s.setOpencodeModel(id); s.sessionOpencode.value = "" } else s.sessionOpencode.value = id }
 
     Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("OpenCode (البرمجة)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text("OpenCode (البرمجة)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f))
         Text(
             if (vm.opencodeLoading) "بيحمّل…" else "تحديث",
@@ -646,7 +796,7 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     }
     vm.opencodeError?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
     if (models.isEmpty()) {
-        Text("دوس تحديث علشان أجيب موديلات OpenCode من Termux.", style = MaterialTheme.typography.bodySmall,
+        Text("دوس تحديث علشان أجيب موديلات OpenCode من Termux.", style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
@@ -661,19 +811,22 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
     shown.forEach { id ->
         val on = id == current
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(if (on) NovaViolet.copy(alpha = 0.18f) else Color.Transparent)
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
                 .clickable { pick(id) }
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(if (id.isEmpty()) "اللي OpenCode مختاره" else id.substringAfter('/'), style = MaterialTheme.typography.bodyLarge, maxLines = 2)
-                if (id.isNotEmpty()) Text(id.substringBefore('/'), style = MaterialTheme.typography.labelSmall,
+                Text(if (id.isEmpty()) "اللي OpenCode مختاره" else id.substringAfter('/'),
+                    style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 2)
+                if (id.isNotEmpty()) Text(id.substringBefore('/'), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
-            if (id == default) Text("الافتراضي", style = MaterialTheme.typography.labelSmall, color = NovaCyan)
-            if (on) { Spacer(Modifier.size(8.dp)); Text("✓", color = NovaCyan) }
+            if (id == default) Text("الافتراضي", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            if (on) { Spacer(Modifier.size(8.dp)); Text("مختار", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer) }
         }
     }
 }
@@ -686,23 +839,25 @@ private fun ModelSection(
     default: String,
     onPick: (String) -> Unit,
 ) {
-    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+    Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = 18.dp, bottom = 6.dp))
     providers.forEach { c ->
         val on = (selected.ifEmpty { default }) == c.id
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                .background(if (on) NovaViolet.copy(alpha = 0.18f) else Color.Transparent)
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
                 .clickable { onPick(c.id) }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(c.name, style = MaterialTheme.typography.bodyLarge)
-                Text(c.model, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text(c.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(c.model, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
-            if (c.id == default) Text("الافتراضي", style = MaterialTheme.typography.labelSmall, color = NovaCyan)
-            if (on) { Spacer(Modifier.size(8.dp)); Text("✓", color = NovaCyan) }
+            if (c.id == default) Text("الافتراضي", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            if (on) { Spacer(Modifier.size(8.dp)); Text("مختار", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer) }
         }
     }
 }
