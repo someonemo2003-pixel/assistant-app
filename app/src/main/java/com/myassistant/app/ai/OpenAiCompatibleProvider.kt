@@ -2,6 +2,7 @@ package com.myassistant.app.ai
 
 import com.myassistant.app.core.ChatMessage
 import com.myassistant.app.core.Role
+import com.myassistant.app.core.THINKING_KEY
 import com.myassistant.app.core.ToolCall
 import com.myassistant.app.core.newId
 import org.json.JSONArray
