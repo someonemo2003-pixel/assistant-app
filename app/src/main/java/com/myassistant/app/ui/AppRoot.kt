@@ -39,6 +39,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
                 Screen.Chats -> ChatsScreen(vm)
                 Screen.Learned -> LearnedScreen(vm)
                 Screen.Permissions -> PermissionsScreen(vm)
+                Screen.BlockApps -> BlockAppsScreen(vm)
             }
         }
     }

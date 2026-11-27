@@ -214,6 +214,14 @@ class AllProvidersFailedException(val errors: List<String>) :
 class ProviderRouter(private val providers: () -> List<Pair<String, LlmProvider>>) {
 
     /** [preferred] = provider id to try first (e.g. the one chosen for chatting or for phone actions). */
+    /** A reply that is gibberish: fake [[tool]] tags written as text, or Chinese/Japanese mixed in. */
+    internal fun looksBroken(text: String): Boolean {
+        if (text.isBlank()) return false
+        val fakeTags = Regex("""\[\[[a-z_]+""").findAll(text).count()
+        val cjk = text.count { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9fff' || it in '\uff00'..'\uffef' }
+        return fakeTags >= 2 || cjk >= 3
+    }
+
     suspend fun complete(
         system: String,
         history: List<ChatMessage>,
@@ -229,7 +237,10 @@ class ProviderRouter(private val providers: () -> List<Pair<String, LlmProvider>
         for (p in list) {
             try {
                 onAttempt(p.name, failed)
-                return p.complete(system, history, tools).copy(providerName = p.name)
+                val reply = p.complete(system, history, tools)
+                // Some free models break down and write fake tool tags or other languages: try the next one.
+                if (reply.toolCalls.isEmpty() && looksBroken(reply.text)) throw ProviderException("رد مكسور")
+                return reply.copy(providerName = p.name)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

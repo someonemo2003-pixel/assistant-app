@@ -263,7 +263,7 @@ object FastParser {
 
     /** "خلّي OpenCode …" / "اطلب من OpenCode …" / "OpenCode: …" — group 2 is the task. */
     private val openCodeRegex = Regex(
-        """^\s*(خل[ّ]?ي|خللي|اطلب من|قول ل|قول لـ|ابعت ل|ابعت لـ|ask|let|have|open\s?code\s*:)\s*(?:open\s?code\b)?[\s:،,]*(.+)$""",
+        """^\s*(خل[ّ]?[يى]|خلل[يى]|اطلب من|قول ل|قول لـ|ابعت ل|ابعت لـ|ask|let|have|open\s?code\s*:)\s*(?:open\s?code\b)?[\s:،,]*(.+)$""",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
     )
 

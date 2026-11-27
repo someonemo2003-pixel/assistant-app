@@ -41,13 +41,22 @@ internal suspend fun findContacts(ctx: ToolContext, query: String, limit: Int = 
 class FindContactTool : Tool {
     override val name = "find_contact"
     override val title = "جهات الاتصال"
-    override val description = "Find a contact's phone number by name (works with Arabic or English names)."
-    override val parameters = Schema.obj("name" to Schema.string("Contact name or part of it"), required = listOf("name"))
+    override val description =
+        "The phone's contacts (the same ones Truecaller and the dialer show). Give a name to find someone's number, " +
+            "or leave it empty to list all contacts. Use this instead of opening Truecaller or the contacts app."
+    override val parameters = Schema.obj("name" to Schema.string("Contact name or part of it; empty = all contacts"))
     override val permissions = listOf(Manifest.permission.READ_CONTACTS)
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        val list = findContacts(ctx, args.str("name"))
-        return if (list.isEmpty()) "No contact matches \"${args.str("name")}\"" else list.joinToString("\n") { "${it.first}: ${it.second}" }
+        val q = args.str("name")
+        if (q.isBlank()) {
+            val all = findContacts(ctx, "", limit = 5000).sortedBy { it.first }
+            if (all.isEmpty()) return "No contacts on the phone"
+            return "${all.size} contacts:\n" + all.take(300).joinToString("\n") { "${it.first}: ${it.second}" } +
+                (if (all.size > 300) "\n… and ${all.size - 300} more (ask for a name to find one)" else "")
+        }
+        val list = findContacts(ctx, q)
+        return if (list.isEmpty()) "No contact matches \"$q\"" else list.joinToString("\n") { "${it.first}: ${it.second}" }
     }
 }
 
