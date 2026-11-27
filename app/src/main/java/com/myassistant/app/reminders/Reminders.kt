@@ -184,7 +184,7 @@ object ReminderScheduler {
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "التذكيرات", NotificationManager.IMPORTANCE_HIGH))
         }
         val open = PendingIntent.getActivity(ctx, 9, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val title = if (r.isPlace) "⏰ " + (if (r.event == "leave") "وإنت خارج من ${r.place}" else "وصلت ${r.place}") else "⏰ تذكير"
+        val title = if (r.isPlace) "" + (if (r.event == "leave") "وإنت خارج من ${r.place}" else "وصلت ${r.place}") else "تذكير"
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(title)

@@ -54,7 +54,7 @@ fun LearnedScreen(vm: AppViewModel) {
         ) {
             item {
                 Text(
-                    "كل جملة هنا بتتنفّذ فوراً ومن غير نت. 👤 = إنت علّمته، 🤖 = اتعلمه من العقل الكبير.\n" +
+                    "كل جملة هنا بتتنفّذ فوراً ومن غير نت. = إنت علّمته، = اتعلمه من العقل الكبير.\n" +
                         "عشان تعلّمه اختصار، قول في الشات مثلاً: \"لما أقول وضع النوم اعمل منبه 7 الصبح\".",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -72,7 +72,7 @@ fun LearnedScreen(vm: AppViewModel) {
                     Row(Modifier.padding(start = 16.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                (if (e.source == "user") "👤 " else "🤖 ") + "\"${e.phrase}\"",
+                                (if (e.source == "user") "" else "") + "\"${e.phrase}\"",
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(

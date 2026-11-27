@@ -43,10 +43,10 @@ class SuspendAppTool : Tool {
         "on" to Schema.string("'true' to pause, 'false' to resume"),
     )
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        if (!DeviceOwner.isOwner(ctx.app)) return "Device owner is OFF — tell the user to enable it from Settings → 🛡️ التحكم الكامل."
+        if (!DeviceOwner.isOwner(ctx.app)) return "Device owner is OFF — tell the user to enable it from Settings → التحكم الكامل."
         val app = DeviceOwner.findInstalled(ctx.app, args.str("app")) ?: return "App not found"
         val on = args.str("on") != "false"
-        return if (DeviceOwner.suspend(ctx.app, app.second, on)) (if (on) "⏸️ ${app.first} متوقف" else "▶️ ${app.first} رجع يشتغل") else "Failed"
+        return if (DeviceOwner.suspend(ctx.app, app.second, on)) (if (on) "${app.first} متوقف" else "${app.first} رجع يشتغل") else "Failed"
     }
 }
 
@@ -56,7 +56,7 @@ class LockPhoneTool : Tool {
     override val description = "Lock the screen now. Needs device-owner control."
     override val parameters = Schema.obj()
     override suspend fun execute(args: JSONObject, ctx: ToolContext) =
-        if (DeviceOwner.lockNow(ctx.app)) "🔒 Locked" else "Can't lock — device owner is OFF"
+        if (DeviceOwner.lockNow(ctx.app)) "Locked" else "Can't lock — device owner is OFF"
 }
 
 class MuteNotificationsTool : Tool {

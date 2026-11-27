@@ -12,11 +12,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val OFF = "Notification access is OFF. Tell the user: ⚙️ → الصلاحيات → قراءة الإشعارات."
+private const val OFF = "Notification access is OFF. Tell the user: → الصلاحيات → قراءة الإشعارات."
 
 private fun line(n: SavedNotification, fmt: SimpleDateFormat, app: String = n.app): String {
     val where = if (n.conversation.isNotBlank() && n.conversation != n.sender) " in \"${n.conversation}\"" else ""
-    val kind = if (n.isEmail) "📧 " else ""
+    val kind = if (n.isEmail) "" else ""
     return "[${fmt.format(Date(n.time))}] $kind$app · ${n.sender}$where: ${n.text}"
 }
 

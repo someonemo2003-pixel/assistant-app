@@ -21,18 +21,18 @@ object ExpenseParser {
 
     /** key → Arabic label. */
     val categories = linkedMapOf(
-        "food" to "🍔 أكل",
-        "groceries" to "🛒 سوبر ماركت",
-        "transport" to "🚕 مواصلات",
-        "fuel" to "⛽ بنزين",
-        "bills" to "💡 فواتير وشحن",
-        "shopping" to "🛍️ شوبينج",
-        "health" to "💊 صحة",
-        "entertainment" to "🎬 ترفيه",
-        "transfers" to "🔁 تحويلات",
-        "cash" to "🏧 سحب كاش",
-        "income" to "💵 فلوس داخلة",
-        "other" to "📦 أخرى",
+        "food" to "أكل",
+        "groceries" to "سوبر ماركت",
+        "transport" to "مواصلات",
+        "fuel" to "بنزين",
+        "bills" to "فواتير وشحن",
+        "shopping" to "شوبينج",
+        "health" to "صحة",
+        "entertainment" to "ترفيه",
+        "transfers" to "تحويلات",
+        "cash" to "سحب كاش",
+        "income" to "فلوس داخلة",
+        "other" to "أخرى",
     )
 
     private val currencyWords = "EGP|LE|L\\.E|USD|SAR|AED|EUR|ج\\.م|جنيه|جنية|جم|دولار|ريال|درهم|يورو"

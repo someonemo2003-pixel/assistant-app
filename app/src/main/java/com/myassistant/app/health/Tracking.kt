@@ -172,7 +172,7 @@ class WalkService : Service(), LocationListener {
         val open = PendingIntent.getActivity(this, 4, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("🚶 بيتتبّع مشيك")
+            .setContentTitle("بيتتبّع مشيك")
             .setContentText(text)
             .setOngoing(true)
             .setContentIntent(open)

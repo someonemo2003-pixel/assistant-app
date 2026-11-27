@@ -177,11 +177,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Chat commands that open a page ("/blockapps" …). */
     fun runCommand(text: String) {
         val cmd = text.trim().substringBefore(' ').lowercase()
+
         when (SlashCommands.all.firstOrNull { it.command == cmd }?.command) {
+            "/new" -> newChat()
+            "/chats" -> screen = Screen.Chats
+            "/models" -> modelPickerRequest = true
             "/blockapps" -> { screen = Screen.BlockApps; loadApps() }
-            else -> notice = "مفيش أمر اسمه $cmd"
+            "/memory" -> screen = Screen.Memory
+            "/learned" -> screen = Screen.Learned
+            "/permissions" -> screen = Screen.Permissions
+            "/keys" -> screen = Screen.Settings
+            "/update" -> {
+                notice = "بدوّر على تحديث…"
+                viewModelScope.launch {
+                    notice = runCatching { com.myassistant.app.update.Updater.checkAndInstall(getApplication()) }
+                        .getOrElse { "مقدرتش أشوف التحديثات دلوقتي" }
+                }
+            }
+            "/auto" -> { settings.setChatMode(com.myassistant.app.agent.ChatMode.AUTO); notice = "الوضع: تلقائي" }
+            "/talk" -> { settings.setChatMode(com.myassistant.app.agent.ChatMode.TALK); notice = "الوضع: كلام بس" }
+            "/phone" -> { settings.setChatMode(com.myassistant.app.agent.ChatMode.PHONE); notice = "الوضع: التحكم في الموبايل" }
+            "/code" -> { settings.setChatMode(com.myassistant.app.agent.ChatMode.CODE); notice = "الوضع: OpenCode" }
+            else -> notice = "مفيش أمر اسمه $cmd. اكتب / علشان تشوف الأوامر."
         }
     }
+
+    /** "/models" asks the chat screen to open the model menu. */
+    var modelPickerRequest by mutableStateOf(false)
 
     // ---- /blockapps ----
 
@@ -311,7 +333,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (already == true) return@launch
             val saved = runCatching { graph.memoryExtractor.extract(snapshot) }.getOrNull() ?: return@launch
             runCatching { graph.chats.markExtracted(convId) }
-            if (saved > 0) withContext(Dispatchers.Main) { notice = "🧠 اتحفظ $saved معلومة جديدة في الذاكرة" }
+            if (saved > 0) withContext(Dispatchers.Main) { notice = "اتحفظ $saved معلومة جديدة في الذاكرة" }
         }
     }
 
@@ -384,12 +406,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Builds and shows the report right now (to try it). */
     fun reportNow() {
-        notice = "⏳ بيجهّز التقرير…"
+        notice = "بيجهّز التقرير…"
         graph.appScope.launch {
             val ctx = getApplication<Application>()
             val msg = try {
                 com.myassistant.app.mail.DailyReport.deliver(ctx, com.myassistant.app.mail.DailyReport.build(ctx))
-                "📋 التقرير جاهز — هتلاقيه في الإشعارات وفي المحادثات"
+                "التقرير جاهز — هتلاقيه في الإشعارات وفي المحادثات"
             } catch (e: Exception) {
                 "معرفتش أعمل التقرير: ${e.message}"
             }
@@ -481,7 +503,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             notice = try {
                 val n = withContext(Dispatchers.IO) { com.myassistant.app.data.Backup.export(getApplication(), uri) }
-                "💾 اتحفظت النسخة الاحتياطية ($n ملف)"
+                "اتحفظت النسخة الاحتياطية ($n ملف)"
             } catch (e: Exception) {
                 "معرفتش أحفظ النسخة: ${e.message}"
             }

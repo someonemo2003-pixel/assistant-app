@@ -80,7 +80,7 @@ object Updater {
         val r = runCatching { latest() }.getOrElse { return "معرفتش أوصل لـ GitHub: ${it.message}" }
             ?: return "مفيش نسخ منشورة"
         val cur = current(ctx)
-        if (!newer(r.version, cur)) return "✅ عندك آخر نسخة ($cur)"
+        if (!newer(r.version, cur)) return "عندك آخر نسخة ($cur)"
         val file = withContext(Dispatchers.IO) {
             val f = File(ctx.cacheDir, "update.apk")
             Http.client.newCall(Request.Builder().url(r.apkUrl).build()).execute().use { resp ->
@@ -90,7 +90,7 @@ object Updater {
             f
         }
         withContext(Dispatchers.IO) { install(ctx, file, r.version) }
-        return "⬇️ بيتسطب ${r.version}…"
+        return "بيتسطب ${r.version}…"
     }
 
     private fun install(ctx: Context, apk: File, version: String) {
@@ -154,7 +154,7 @@ class UpdateReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 val v = Updater.current(ctx)
                 Updater.prefs(ctx).edit().remove("installing").apply()
-                Updater.notify(ctx, "✨ Nova اتحدّث", "النسخة $v")
+                Updater.notify(ctx, "Nova اتحدّث", "النسخة $v")
             }
         }
     }

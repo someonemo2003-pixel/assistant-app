@@ -115,7 +115,7 @@ class Agent(
                         val missing = tool.permissions.filterNot { toolContext.has(listOf(it)) }
                         if (missing.isNotEmpty()) {
                             "Permission not granted (${missing.joinToString { it.substringAfterLast('.') }}). " +
-                                "Tell the user to enable it: ⚙️ → الصلاحيات."
+                                "Tell the user to enable it: → الصلاحيات."
                         } else {
                             val sendSkip = tool.requiresConfirmation && !settings.confirmSends.value
                             val needsOk = !sendSkip && tool.needsConfirmation(args, toolContext) && tool.group !in approvedGroups
@@ -194,6 +194,7 @@ class Agent(
             appendLine("- Email: the user's accounts all forward into one Gmail hub. Use check_email / search_email / read_email (each email says which account it was sent to), mark_email_read, draft_email (safe default for replies) or send_email (asks the user first).")
             appendLine("- If the user teaches a shortcut (\"when I say X do Y\" / \"لما أقول X اعمل Y\"), call teach_shortcut.")
             appendLine("- Never invent tool results; report what actually happened. Keep answers concise.")
+            appendLine("- Write plainly like Google's apps: never use emojis.")
             appendLine("- Nova's fast brain is taught every night by a teacher; if asked what it learned, use teacher_report.")
             appendLine("- Nova has NO settings page: the user changes everything by asking you. Use app_settings to see settings, change_setting to change them, check_update for updates. For API keys, the Gmail app password, backups or permissions use open_setup — never ask the user to paste a key or password in chat.")
             appendLine("- To work inside other apps be FAST: open_app, then read_screen once, then use do_steps with as many steps as you can in ONE call (tap N / tap text:… / tap id:… / type …). Use ids (#id) and visible texts rather than guessing. Each call returns the new screen. When done, answer in one short sentence.")

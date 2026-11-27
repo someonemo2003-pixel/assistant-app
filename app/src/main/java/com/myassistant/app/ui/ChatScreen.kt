@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -125,6 +126,7 @@ fun ChatScreen(vm: AppViewModel) {
     var sendFlashKey by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var pickerOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(vm.modelPickerRequest) { if (vm.modelPickerRequest) { pickerOpen = true; vm.modelPickerRequest = false } }
     if (pickerOpen) ModelPicker(vm, configs.filter { it.enabled && vm.providerStore.hasKey(it.id) }) { pickerOpen = false }
 
     val haze = remember { dev.chrisbanes.haze.HazeState() }
@@ -439,7 +441,8 @@ private fun SlashSuggestions(input: String, onPick: (String) -> Unit) {
     if (list.isEmpty()) return
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .heightIn(max = 280.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),
     ) {
         list.forEach { c ->
             Row(

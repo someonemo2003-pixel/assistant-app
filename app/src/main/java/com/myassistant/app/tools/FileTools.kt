@@ -18,7 +18,7 @@ private val ROOT: File get() = Environment.getExternalStorageDirectory()
 private fun canReadFiles(): Boolean =
     if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager() else true
 
-private const val NO_FILES = "File access is OFF. Tell the user: ⚙️ → الصلاحيات → الوصول لكل الملفات."
+private const val NO_FILES = "File access is OFF. Tell the user: → الصلاحيات → الوصول لكل الملفات."
 
 /** Resolves a user path like "Download/x.pdf" or "/sdcard/Download" safely inside shared storage. */
 private fun resolve(path: String): File {
@@ -52,8 +52,8 @@ class ListFilesTool : Tool {
         buildString {
             appendLine("${dir.path.removePrefix(ROOT.path).ifEmpty { "/" }} — ${items.size} items")
             sorted.take(80).forEach {
-                if (it.isDirectory) appendLine("📁 ${it.name}/")
-                else appendLine("📄 ${it.name} (${size(it.length())}, ${fmt.format(Date(it.lastModified()))})")
+                if (it.isDirectory) appendLine("${it.name}/")
+                else appendLine("${it.name} (${size(it.length())}, ${fmt.format(Date(it.lastModified()))})")
             }
             if (sorted.size > 80) appendLine("…and ${sorted.size - 80} more")
         }

@@ -72,7 +72,7 @@ object Focus {
         save(ctx, rules(ctx) + rule)
         apply(ctx)
         return buildString {
-            append("✅ ${rule.name}: ${rule.labels.joinToString("، ")}")
+            append("${rule.name}: ${rule.labels.joinToString("، ")}")
             if (hasWindow) append(" — مقفولين من ${rule.from} لحد ${rule.to}")
             if (rule.limitMin > 0) append(" — ${rule.limitMin} دقيقة في اليوم")
             if (missing.isNotEmpty()) append(". مش لاقي: ${missing.joinToString("، ")}")
@@ -87,7 +87,7 @@ object Focus {
         if (after.size == before.size) return "مش لاقي قاعدة اسمها \"$q\""
         save(ctx, after)
         apply(ctx)
-        return "✅ اتشالت"
+        return "اتشالت"
     }
 
     private fun nowMinutes(): Int = Calendar.getInstance().let { it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE) }

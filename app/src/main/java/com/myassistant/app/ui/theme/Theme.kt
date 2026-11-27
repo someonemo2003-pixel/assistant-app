@@ -53,6 +53,25 @@ private val Dark = darkColorScheme(
     onErrorContainer = Color(0xFFFFE1E3),
 )
 
+/** Google Sans (Latin letters and numbers); Arabic falls back to the phone's own Arabic font, like Google's apps. */
+private val GoogleSans = androidx.compose.ui.text.font.FontFamily(
+    androidx.compose.ui.text.font.Font(com.myassistant.app.R.font.google_sans_regular, androidx.compose.ui.text.font.FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(com.myassistant.app.R.font.google_sans_medium, androidx.compose.ui.text.font.FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(com.myassistant.app.R.font.google_sans_medium, androidx.compose.ui.text.font.FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(com.myassistant.app.R.font.google_sans_bold, androidx.compose.ui.text.font.FontWeight.Bold),
+)
+
+private val AppTypography = androidx.compose.material3.Typography().let { t ->
+    fun androidx.compose.ui.text.TextStyle.gs() = copy(fontFamily = GoogleSans)
+    t.copy(
+        displayLarge = t.displayLarge.gs(), displayMedium = t.displayMedium.gs(), displaySmall = t.displaySmall.gs(),
+        headlineLarge = t.headlineLarge.gs(), headlineMedium = t.headlineMedium.gs(), headlineSmall = t.headlineSmall.gs(),
+        titleLarge = t.titleLarge.gs(), titleMedium = t.titleMedium.gs(), titleSmall = t.titleSmall.gs(),
+        bodyLarge = t.bodyLarge.gs(), bodyMedium = t.bodyMedium.gs(), bodySmall = t.bodySmall.gs(),
+        labelLarge = t.labelLarge.gs(), labelMedium = t.labelMedium.gs(), labelSmall = t.labelSmall.gs(),
+    )
+}
+
 /** Rounded, soft shapes like Google's own apps. */
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
@@ -81,6 +100,7 @@ fun AssistantTheme(content: @Composable () -> Unit) {
         colorScheme = colors,
         motionScheme = androidx.compose.material3.MotionScheme.standard(),
         shapes = AppShapes,
+        typography = AppTypography,
         content = content,
     )
 }

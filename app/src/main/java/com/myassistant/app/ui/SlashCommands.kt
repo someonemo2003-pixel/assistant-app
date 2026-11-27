@@ -6,6 +6,7 @@ object SlashCommands {
 
     val all = listOf(
         Command("/blockapps", "البرامج المحظورة"),
+        Command("/update", "شوف فيه تحديث"),
     )
 
     /** Commands that start with what the user typed (only while the message starts with "/"). */

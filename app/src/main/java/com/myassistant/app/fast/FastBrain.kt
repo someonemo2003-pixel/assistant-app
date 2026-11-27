@@ -81,13 +81,13 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
             is LocalIntent.Alarm -> run(
                 "set_alarm", JSONObject().put("hour", intent.hour).put("minute", intent.minute),
                 ok = { it.startsWith("Alarm set") },
-                success = "تمام، ضبطتلك منبه ${clock(intent.hour, intent.minute)} ⏰",
+                success = "تمام، ضبطتلك منبه ${clock(intent.hour, intent.minute)} ",
                 failure = "معرفتش أضبط المنبه، تطبيق الساعة مستجابش.",
             )
             is LocalIntent.Timer -> run(
                 "set_timer", JSONObject().put("seconds", intent.seconds),
                 ok = { it.startsWith("Timer started") },
-                success = "اشتغل مؤقت ${duration(intent.seconds)} ⏱️",
+                success = "اشتغل مؤقت ${duration(intent.seconds)} ",
                 failure = "معرفتش أشغّل المؤقت.",
             )
             is LocalIntent.Remember -> run(
@@ -105,7 +105,7 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 val m = Regex("(\\d+) steps \\(≈ ([\\d.]+) km").findAll(r).lastOrNull() ?: return null
                 val label = when (intent.period) { "yesterday" -> "امبارح"; "week" -> "الأسبوع ده"; else -> "النهارده" }
                 val total = if (intent.period == "week") Regex("Total: (\\d+)").find(r)?.groupValues?.get(1) ?: m.groupValues[1] else m.groupValues[1]
-                actionMessages("steps", args, r, "مشيت $label $total خطوة 👣" + if (intent.period != "week") " (حوالي ${m.groupValues[2]} كم)" else "")
+                actionMessages("steps", args, r, "مشيت $label $total خطوة " + if (intent.period != "week") " (حوالي ${m.groupValues[2]} كم)" else "")
             }
             is LocalIntent.Walk -> {
                 val tool = tools["walk_tracking"] ?: return null
@@ -113,11 +113,11 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 val args = JSONObject().put("action", if (intent.start) "start" else "stop")
                 val r = tool.execute(args, ctx)
                 val text = when {
-                    r.startsWith("Walk tracking started") -> "بدأت أتتبّع مشيك 🚶 — قولّي \"وقّف المشي\" لما تخلص"
+                    r.startsWith("Walk tracking started") -> "بدأت أتتبّع مشيك — قولّي \"وقّف المشي\" لما تخلص"
                     r.startsWith("Walk saved") -> Regex("([\\d.]+) km, (\\d+) steps, (\\d+) min").find(r)?.let {
-                        "خلصت ✓ مشيت ${it.groupValues[1]} كم، ${it.groupValues[2]} خطوة في ${it.groupValues[3]} دقيقة 🗺️"
+                        "خلصت ✓ مشيت ${it.groupValues[1]} كم، ${it.groupValues[2]} خطوة في ${it.groupValues[3]} دقيقة "
                     } ?: "وقّفت التتبّع ✓"
-                    r.startsWith("Already") -> "أنا بتتبّعك فعلاً 🚶"
+                    r.startsWith("Already") -> "أنا بتتبّعك فعلاً "
                     else -> "مفيش تتبّع شغال دلوقتي"
                 }
                 actionMessages("walk_tracking", args, r, text)
@@ -162,15 +162,15 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
                 val args = JSONObject().put("stream", "ring").put("percent", pct)
                 val r = tool.execute(args, ctx)
                 runCatching { tool.execute(JSONObject().put("stream", "notification").put("percent", pct), ctx) }
-                actionMessages("set_volume", args, r, if (intent.on) "الموبايل بقى صامت 🔕" else "رجّعت الصوت 🔔")
+                actionMessages("set_volume", args, r, if (intent.on) "الموبايل بقى صامت " else "رجّعت الصوت ")
             }
             is LocalIntent.Battery -> {
                 val bm = ctx.app.getSystemService(android.content.Context.BATTERY_SERVICE) as android.os.BatteryManager
                 val level = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
-                listOf(reply("البطارية $level%" + if (bm.isCharging) " وبتشحن ⚡" else ""))
+                listOf(reply("البطارية $level%" + if (bm.isCharging) " وبتشحن " else ""))
             }
             is LocalIntent.LockPhone -> run(
-                "lock_phone", JSONObject(), ok = { it.startsWith("🔒") }, success = "قفلت الشاشة 🔒", failure = "معرفتش أقفل الشاشة.",
+                "lock_phone", JSONObject(), ok = { it.startsWith("") }, success = "قفلت الشاشة ", failure = "معرفتش أقفل الشاشة.",
             )
             is LocalIntent.CheckUpdate -> {
                 val tool = tools["check_update"] ?: return null
@@ -180,7 +180,7 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
             is LocalIntent.Flashlight -> run(
                 "flashlight", JSONObject().put("on", intent.on.toString()),
                 ok = { it.startsWith("Flashlight o") },
-                success = if (intent.on) "ولّعت الكشاف 🔦" else "طفيت الكشاف",
+                success = if (intent.on) "ولّعت الكشاف " else "طفيت الكشاف",
                 failure = "معرفتش أتحكم في الكشاف.",
             )
         }
@@ -337,7 +337,7 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
             append("ده اللي أعرفه عنك (").append(items.size).append(" حاجة):")
             for (key in cats.all.keys) {
                 val list = byCat[key] ?: continue
-                val label = cats.label(key).substringAfter(' ')
+                val label = cats.label(key)
                 append("\n\n").append(label).append(":")
                 list.take(8).forEach { append("\n• ").append(it.text) }
                 if (list.size > 8) append("\n… و").append(list.size - 8).append(" كمان")
@@ -352,7 +352,7 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
     private fun nowMinute() = Calendar.getInstance().get(Calendar.MINUTE)
 
     companion object {
-        const val NAME = "⚡ سريع"
+        const val NAME = "سريع"
 
         fun clock(hour: Int, minute: Int): String {
             val h12 = when {

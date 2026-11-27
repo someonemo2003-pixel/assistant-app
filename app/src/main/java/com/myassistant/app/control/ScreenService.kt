@@ -55,7 +55,7 @@ class ScreenService : AccessibilityService() {
         // A limit may have just been reached: make it stick (suspend) when we can.
         if (com.myassistant.app.admin.DeviceOwner.isOwner(this)) Thread { com.myassistant.app.focus.Focus.apply(applicationContext) }.start()
         performGlobalAction(GLOBAL_ACTION_HOME)
-        toast("⏳ $why")
+        toast("$why")
         Thread { runCatching { com.myassistant.app.reading.Reading.offerInstead(applicationContext) } }.start()
     }
 
@@ -135,7 +135,7 @@ class ScreenService : AccessibilityService() {
             val trimmed = texts.map { it.trim() }
             val hit = blockedApps.firstOrNull { b -> b.name.length >= 3 && trimmed.any { it.equals(b.name, true) } } ?: return
             performGlobalAction(GLOBAL_ACTION_BACK)
-            toast("🚫 ${hit.name} ممنوع على الموبايل ده")
+            toast("${hit.name} ممنوع على الموبايل ده")
             Thread { runCatching { com.myassistant.app.reading.Reading.offerInstead(applicationContext) } }.start()
             return
         }
@@ -196,7 +196,7 @@ class ScreenService : AccessibilityService() {
             for (c in cancels) {
                 if (ownerCard(c, onScreen) != null) {
                     val target = generateSequence(c) { it.parent }.take(3).firstOrNull { it.isClickable }
-                    if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) toast("🚫 ${b.name} ممنوع — لغيت التحميل")
+                    if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) toast("${b.name} ممنوع — لغيت التحميل")
                 }
             }
         }
@@ -217,14 +217,14 @@ class ScreenService : AccessibilityService() {
         covers.clear()
         for (r in rects) {
             val v = android.widget.TextView(this).apply {
-                text = "🚫 ممنوع"
+                text = "ممنوع"
                 gravity = android.view.Gravity.CENTER
                 setTextColor(android.graphics.Color.WHITE)
                 textSize = 14f
                 background = android.graphics.drawable.GradientDrawable().apply {
                     setColor(android.graphics.Color.parseColor("#E5DC2626")); cornerRadius = r.height() / 2f
                 }
-                setOnClickListener { toast("🚫 ${name ?: "البرنامج ده"} ممنوع على الموبايل ده") }
+                setOnClickListener { toast("${name ?: "البرنامج ده"} ممنوع على الموبايل ده") }
             }
             val lp = android.view.WindowManager.LayoutParams(
                 r.width(), r.height(), r.left, r.top,

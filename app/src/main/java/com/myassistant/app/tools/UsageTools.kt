@@ -37,7 +37,7 @@ class ScreenTimeTool : Tool {
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String = withContext(Dispatchers.IO) {
         if (!hasUsageAccess(ctx.app)) {
-            return@withContext "Usage access is OFF. Tell the user: ⚙️ → الصلاحيات → بيانات الاستخدام."
+            return@withContext "Usage access is OFF. Tell the user: → الصلاحيات → بيانات الاستخدام."
         }
         val period = args.str("period").ifEmpty { "today" }
         val (start, end, days) = range(period)

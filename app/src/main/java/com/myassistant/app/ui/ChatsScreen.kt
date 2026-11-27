@@ -95,7 +95,7 @@ fun ChatsScreen(vm: AppViewModel) {
                         Column(Modifier.weight(1f)) {
                             Text(c.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
-                                fmt.format(Date(c.updatedAt)) + if (c.extracted) " · 🧠" else "",
+                                fmt.format(Date(c.updatedAt)) + if (c.extracted) " · " else "",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

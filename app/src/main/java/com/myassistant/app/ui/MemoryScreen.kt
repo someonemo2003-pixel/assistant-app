@@ -64,7 +64,7 @@ import java.util.Locale
 @Composable
 fun MemoryScreen(vm: AppViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("🧠 الذاكرة", "💰 المصاريف", "⏰ التذكيرات")
+    val tabs = listOf("الذاكرة", "المصاريف", "التذكيرات")
 
     Scaffold(
         topBar = {
@@ -138,7 +138,7 @@ private fun MemoryFilters(vm: AppViewModel) {
                 if (n > 0 || filter == k) FilterChip(selected = filter == k, onClick = { filter = k }, label = { Text("$label ($n)") })
             }
         }
-        OutlinedTextField(query, { query = it }, placeholder = { Text("🔍 دوّر…") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(query, { query = it }, placeholder = { Text("دوّر…") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(newText, { newText = it }, placeholder = { Text("ضيف معلومة…") }, modifier = Modifier.weight(1f), maxLines = 3)
             Spacer(Modifier.size(6.dp))
@@ -198,7 +198,7 @@ private fun ExpensesView(vm: AppViewModel) {
         }
         val shown = vm.expenses.filter { cat == null || it.category == cat }
         if (shown.isEmpty()) {
-            Empty("مفيش عمليات. المساعد بيقرا رسايل البنك والمحفظة لوحده — محتاج صلاحية 💬 الرسايل SMS.")
+            Empty("مفيش عمليات. المساعد بيقرا رسايل البنك والمحفظة لوحده — محتاج صلاحية الرسايل SMS.")
         }
         shown.forEach { e ->
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -246,8 +246,8 @@ private fun RemindersView(vm: AppViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(r.text, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            if (r.isPlace) "📍 " + (if (r.event == "leave") "لما تخرج من " else "لما توصل ") + r.place
-                            else "🕐 " + fmt.format(Date(r.at)) + (repeatLabel[r.repeat]?.let { " · $it" } ?: ""),
+                            if (r.isPlace) "" + (if (r.event == "leave") "لما تخرج من " else "لما توصل ") + r.place
+                            else "" + fmt.format(Date(r.at)) + (repeatLabel[r.repeat]?.let { " · $it" } ?: ""),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -256,7 +256,7 @@ private fun RemindersView(vm: AppViewModel) {
                 }
             }
         }
-        Text("📍 أماكنك المحفوظة", style = MaterialTheme.typography.titleSmall)
+        Text("أماكنك المحفوظة", style = MaterialTheme.typography.titleSmall)
         if (vm.places.isEmpty()) Text("وإنت في البيت قول: \"احفظ مكاني ده باسم البيت\"", style = MaterialTheme.typography.bodySmall)
         vm.places.forEach { p ->
             Row(verticalAlignment = Alignment.CenterVertically) {

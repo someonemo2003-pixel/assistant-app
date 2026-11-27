@@ -13,15 +13,15 @@ object MemoryCategories {
     const val PLACES = "places"
     /** key → Arabic label with icon. Order = display order. */
     val all = linkedMapOf(
-        "personal" to "👤 عني",
-        "people" to "👨‍👩‍👧 ناس",
-        "work" to "💼 شغل ودراسة",
-        "health" to "❤️ صحة",
-        "money" to "💰 فلوس",
-        "places" to "📍 أماكن",
-        "dates" to "📅 مناسبات ومواعيد",
-        "preferences" to "⭐ تفضيلات",
-        GENERAL to "🗂️ عام",
+        "personal" to "عني",
+        "people" to "ناس",
+        "work" to "شغل ودراسة",
+        "health" to "صحة",
+        "money" to "فلوس",
+        "places" to "أماكن",
+        "dates" to "مناسبات ومواعيد",
+        "preferences" to "تفضيلات",
+        GENERAL to "عام",
     )
 
     fun normalize(key: String?): String = key?.trim()?.lowercase()?.takeIf { it in all } ?: GENERAL

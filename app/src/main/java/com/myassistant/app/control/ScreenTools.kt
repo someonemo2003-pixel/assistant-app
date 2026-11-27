@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 internal const val SCREEN_OFF =
-    "Screen control is OFF. Tell the user to enable it: ⚙️ → الصلاحيات → التحكم في الشاشة (Accessibility)."
+    "Screen control is OFF. Tell the user to enable it: → الصلاحيات → التحكم في الشاشة (Accessibility)."
 
 /** Screen tools share one approval per request (see Agent) — the user approves "control the screen" once. */
 abstract class ScreenTool : Tool {

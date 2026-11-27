@@ -155,7 +155,7 @@ object DeviceOwner {
     fun block(ctx: Context, nameOrPkg: String, pkgHint: String? = null): String {
         val found = findInstalled(ctx, pkgHint ?: nameOrPkg) ?: knownPkg(nameOrPkg)?.let { findInstalled(ctx, it) }
         val pkg = pkgHint?.takeIf { it.contains('.') } ?: found?.second ?: knownPkg(nameOrPkg) ?: nameOrPkg.takeIf { it.contains('.') && ' ' !in it }
-        if (pkg == ctx.packageName) return "مينفعش أمنع نفسي 🙂"
+        if (pkg == ctx.packageName) return "مينفعش أمنع نفسي "
         val name = found?.first ?: pkg?.let { KNOWN[it]?.first() } ?: nameOrPkg.trim()
         val list = blocked(ctx).filterNot { if (pkg != null) it.pkg == pkg else it.name.equals(name, true) } + BlockedApp(name, pkg)
         save(ctx, list)
@@ -245,7 +245,7 @@ object DeviceOwner {
         if (browsersOnly(ctx) && isForbiddenBrowser(ctx, pkg)) {
             remove(ctx, pkg)
             ContextCompat.getMainExecutor(ctx).execute {
-                Toast.makeText(ctx, "🚫 مسموح بس Chrome وEdge ومتصفح الموبايل — اتشال", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, "مسموح بس Chrome وEdge ومتصفح الموبايل — اتشال", Toast.LENGTH_LONG).show()
             }
             runCatching { com.myassistant.app.reading.Reading.offerInstead(ctx) }
             return
@@ -256,7 +256,7 @@ object DeviceOwner {
         val hit = list.firstOrNull { it.pkg == pkg || (it.pkg == null && ((label != null && label.equals(it.name, true)) || knownPkg(it.name) == pkg)) } ?: return
         if (hit.pkg == null) save(ctx, list - hit + hit.copy(pkg = pkg)) // learn the package for next time
         remove(ctx, pkg)
-        ContextCompat.getMainExecutor(ctx).execute { Toast.makeText(ctx, "🚫 ${hit.name} ممنوع — اتشال", Toast.LENGTH_LONG).show() }
+        ContextCompat.getMainExecutor(ctx).execute { Toast.makeText(ctx, "${hit.name} ممنوع — اتشال", Toast.LENGTH_LONG).show() }
         runCatching { com.myassistant.app.reading.Reading.offerInstead(ctx) }
     }
 

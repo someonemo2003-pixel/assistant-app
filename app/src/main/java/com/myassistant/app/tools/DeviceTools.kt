@@ -199,7 +199,7 @@ class BrightnessTool : Tool {
     override val parameters = Schema.obj("percent" to Schema.integer("1-100"), required = listOf("percent"))
 
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
-        if (!Settings.System.canWrite(ctx.app)) return "Brightness control is OFF. Tell the user: ⚙️ → الصلاحيات → تعديل إعدادات النظام."
+        if (!Settings.System.canWrite(ctx.app)) return "Brightness control is OFF. Tell the user: → الصلاحيات → تعديل إعدادات النظام."
         val pct = (args.int("percent") ?: return "Missing percent").coerceIn(1, 100)
         Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
         Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 255 * pct / 100)

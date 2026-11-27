@@ -113,7 +113,7 @@ class NotificationReader : NotificationListenerService() {
                 (r.app.isEmpty() || item.app.contains(r.app, ignoreCase = true)) &&
                     listOf(item.sender, item.conversation, item.text).any { it.contains(r.match, ignoreCase = true) }
             } ?: continue
-            postAlert("🔔 ${item.sender.ifEmpty { item.app }} (${item.app})", item.text, rule.match)
+            postAlert("${item.sender.ifEmpty { item.app }} (${item.app})", item.text, rule.match)
         }
     }
 
