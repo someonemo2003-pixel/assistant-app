@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#9A8CFF</color>
-    <color name="icon_bg">#0B0D12</color>
-    <style name="Theme.Assistant" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0B0D12</item>
-    </style>
+    <color name="brand">#4285F4</color>
+    <color name="icon_bg">#FFFFFF</color>
+    <style name="Theme.Assistant" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

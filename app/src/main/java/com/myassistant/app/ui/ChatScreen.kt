@@ -88,10 +88,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.myassistant.app.core.Role
-import com.myassistant.app.ui.theme.NovaCyan
-import com.myassistant.app.ui.theme.NovaPink
-import com.myassistant.app.ui.theme.NovaViolet
-import com.myassistant.app.ui.theme.UserBubble
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -133,8 +129,8 @@ fun ChatScreen(vm: AppViewModel) {
 
     val haze = remember { dev.chrisbanes.haze.HazeState() }
     val glass = dev.chrisbanes.haze.HazeStyle(
-        backgroundColor = MaterialTheme.colorScheme.background,
-        tint = dev.chrisbanes.haze.HazeTint(MaterialTheme.colorScheme.background.copy(alpha = 0.55f)),
+        backgroundColor = MaterialTheme.colorScheme.surface,
+        tint = dev.chrisbanes.haze.HazeTint(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)),
         blurRadius = 24.dp,
         noiseFactor = 0.04f,
     )
@@ -299,21 +295,21 @@ private fun Bubble(text: String, mine: Boolean, footer: String? = null, thinking
             bottomStart = if (mine) 22.dp else 6.dp,
             bottomEnd = if (mine) 6.dp else 22.dp,
         )
-        val bg = if (mine) Modifier.background(UserBubble, shape)
-        else Modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+        // Google style: your messages in a soft bubble, Nova's answers as plain text.
+        val bg = if (mine) Modifier.background(MaterialTheme.colorScheme.secondaryContainer, shape) else Modifier
         Column(
-            Modifier.widthIn(max = 340.dp).clip(shape).then(bg).padding(horizontal = 16.dp, vertical = 13.dp),
+            Modifier.widthIn(max = if (mine) 320.dp else 600.dp).clip(shape).then(bg)
+                .padding(horizontal = if (mine) 16.dp else 4.dp, vertical = if (mine) 11.dp else 4.dp),
         ) {
             SelectionContainer {
-                Text(text, style = MaterialTheme.typography.bodyLarge, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface)
+                Text(text, style = MaterialTheme.typography.bodyLarge,
+                    color = if (mine) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface)
             }
             if (!thinking.isNullOrBlank()) {
                 Text(
                     if (showThinking) "إخفاء التفكير" else "شوف تفكيره",
                     style = MaterialTheme.typography.labelSmall,
-                    color = NovaCyan.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 6.dp).clickable { showThinking = !showThinking },
                 )
                 if (showThinking) {
@@ -358,7 +354,7 @@ private fun StepsChip(id: String, steps: List<Pair<String, String>>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(6.dp).clip(CircleShape)
-                    .background(if (failed > 0) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else NovaCyan.copy(alpha = 0.7f)),
+                    .background(if (failed > 0) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary),
             )
             Spacer(Modifier.size(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -429,24 +425,11 @@ private fun WorkingLine() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TypingIndicator() {
-    val comp by com.airbnb.lottie.compose.rememberLottieComposition(
-        com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(com.myassistant.app.R.raw.nova_thinking),
-    )
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        com.airbnb.lottie.compose.LottieAnimation(
-            composition = comp,
-            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
-            modifier = Modifier.size(width = 54.dp, height = 18.dp),
-        )
-    }
+    // Google's loading indicator: a shape that slowly morphs while Nova works.
+    androidx.compose.material3.LoadingIndicator(modifier = Modifier.size(36.dp))
 }
 
 /** While the message starts with "/", shows the matching commands; a tap opens that page. */
@@ -538,24 +521,8 @@ private fun InputBar(
             onValueChange = onValueChange,
             modifier = Modifier
                 .weight(1f)
-                .shadow(18.dp, RoundedCornerShape(26.dp))
-                .clip(RoundedCornerShape(26.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.11f),
-                            Color(0xFF282638).copy(alpha = 0.94f),
-                            Color(0xFF191D28).copy(alpha = 0.92f),
-                        ),
-                    ),
-                )
-                .border(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(Color.White.copy(alpha = 0.34f), NovaViolet.copy(alpha = 0.48f), Color.White.copy(alpha = 0.12f)),
-                    ),
-                    RoundedCornerShape(26.dp),
-                )
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .drawBehind {
                     if (sendFlash.value > 0f) {
                         drawRoundRect(
@@ -578,16 +545,17 @@ private fun InputBar(
         )
         Spacer(Modifier.size(10.dp))
         when {
-            busy -> RoundButton(onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = Color.White) }
-            value.isNotBlank() -> RoundButton(onSend) { Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = Color.White) }
-            // The Nova ring is the mic: tap to talk, it glows and moves with your voice.
-            else -> NovaRing(
-                size = 54.dp,
-                active = listening || speaking,
-                level = if (listening) level else if (speaking) 0.35f else 0f,
-                modifier = Modifier.clip(CircleShape).clickable(onClick = onMic)
-                    .semantics { contentDescription = "اتكلم مع Nova" },
-            )
+            busy -> RoundButton(onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = MaterialTheme.colorScheme.onPrimary) }
+            value.isNotBlank() -> RoundButton(onSend) { Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = MaterialTheme.colorScheme.onPrimary) }
+            else -> androidx.compose.material3.FilledTonalIconButton(
+                onClick = onMic,
+                modifier = Modifier.size(52.dp),
+            ) {
+                Icon(
+                    if (listening || speaking) Icons.Filled.Close else Icons.Filled.Mic,
+                    contentDescription = "اتكلم مع Nova",
+                )
+            }
         }
     }
 }
@@ -598,7 +566,7 @@ private fun RoundButton(onClick: () -> Unit, content: @Composable () -> Unit) {
         Modifier
             .size(54.dp)
             .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(NovaViolet, NovaPink)))
+            .background(MaterialTheme.colorScheme.primary)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
@@ -667,7 +635,7 @@ private fun VoiceBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -675,7 +643,7 @@ private fun VoiceBar(
             Text(
                 if (listening) "بسمعك…" else "بيتكلم…" + if (voiceMode) " (وبعدها هسمعك تاني)" else "",
                 style = MaterialTheme.typography.labelMedium,
-                color = NovaCyan,
+                color = MaterialTheme.colorScheme.primary,
             )
             if (listening && partial.isNotEmpty()) {
                 Text(partial, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 3)
@@ -701,7 +669,7 @@ private fun EmptyState(
         NovaRing(size = 200.dp, active = active)
         if (needsKey) {
             Spacer(Modifier.height(28.dp))
-            androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API من الإعدادات", color = NovaCyan) }
+            androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API من الإعدادات", color = MaterialTheme.colorScheme.primary) }
         }
     }
 }
@@ -782,7 +750,7 @@ private fun OpenCodeSection(vm: AppViewModel, asDefault: Boolean) {
             modifier = Modifier.weight(1f))
         Text(
             if (vm.opencodeLoading) "بيحمّل…" else "تحديث",
-            style = MaterialTheme.typography.labelMedium, color = NovaCyan,
+            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.refreshOpencodeModels() }.padding(6.dp),
         )
     }

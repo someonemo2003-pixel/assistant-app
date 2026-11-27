@@ -53,46 +53,40 @@ private val Dark = darkColorScheme(
     onErrorContainer = Color(0xFFFFE1E3),
 )
 
+/** Rounded, soft shapes like Google's own apps. */
 private val AppShapes = Shapes(
-    small = RoundedCornerShape(10.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
     large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(28.dp),
 )
 
+/**
+ * Calm, Google-style theme: colours come from the phone's wallpaper (Material You), light or dark
+ * like the system, and Material 3's standard (calm) motion.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AssistantTheme(content: @Composable () -> Unit) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val colors = when {
+        android.os.Build.VERSION.SDK_INT >= 31 ->
+            if (dark) androidx.compose.material3.dynamicDarkColorScheme(ctx) else androidx.compose.material3.dynamicLightColorScheme(ctx)
+        dark -> Dark
+        else -> androidx.compose.material3.lightColorScheme()
+    }
     MaterialTheme(
-        colorScheme = Dark,
+        colorScheme = colors,
+        motionScheme = androidx.compose.material3.MotionScheme.standard(),
         shapes = AppShapes,
         content = content,
     )
 }
 
+/** Plain app background (no glow). */
 @Composable
 fun AppBackdrop() {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(NovaNight)
-            .drawBehind {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(NovaViolet.copy(alpha = 0.14f), Color.Transparent),
-                        center = Offset(size.width * 0.18f, size.height * 0.12f),
-                        radius = size.width * 0.82f,
-                    ),
-                    radius = size.width * 0.82f,
-                    center = Offset(size.width * 0.18f, size.height * 0.12f),
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(NovaViolet.copy(alpha = 0.055f), Color.Transparent),
-                        center = Offset(size.width * 0.92f, size.height * 0.88f),
-                        radius = size.width * 0.72f,
-                    ),
-                    radius = size.width * 0.72f,
-                    center = Offset(size.width * 0.92f, size.height * 0.88f),
-                )
-            },
-    )
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
 }
