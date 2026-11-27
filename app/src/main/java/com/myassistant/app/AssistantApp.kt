@@ -66,8 +66,13 @@ class AssistantApp : Application() {
     lateinit var graph: AppGraph
         private set
 
+    // Installed as early as possible: library start-up code runs before onCreate.
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(base)
+        CrashLog.install(base)
+    }
+
     override fun onCreate() {
-        CrashLog.install(this)
         super.onCreate()
         graph = AppGraph(this)
         graph.startBackground()

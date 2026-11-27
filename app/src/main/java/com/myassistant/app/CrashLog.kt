@@ -16,7 +16,7 @@ import java.util.Locale
  */
 object CrashLog {
     fun install(ctx: Context) {
-        val app = ctx.applicationContext
+        val app = ctx.applicationContext ?: ctx
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching { write(app, thread, error) }
