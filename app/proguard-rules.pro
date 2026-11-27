@@ -19,3 +19,7 @@
 -dontwarn javax.activation.**
 -dontwarn myjava.awt.datatransfer.**
 
+
+# Room (used by WorkManager) creates its databases by reflection with the no-argument constructor.
+# The stricter R8 in AGP 9 removed it, so the app crashed on start: keep it.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
