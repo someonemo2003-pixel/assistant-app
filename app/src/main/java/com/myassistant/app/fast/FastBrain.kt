@@ -70,8 +70,26 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
         val intent = FastParser.parse(text)
             ?: return fromExperience(text, userOnly = false) ?: fromTemplate(text) ?: fromMeaning(text)
         return when (intent) {
-            is LocalIntent.OpenCodeTask -> openCodePlan(intent.task)
-            is LocalIntent.OpenCodeGo -> openCodeGo()
+            is LocalIntent.OpenCodeTask -> {
+                val tool = tools["opencode_plan"] ?: return null
+                val args = JSONObject().put("task", intent.task)
+                val r = tool.execute(args, ctx)
+                val plan = r.removePrefix("PLAN (nothing was changed yet):").trim()
+                val failed = com.myassistant.app.terminal.OpenCode.lastPlanAt == 0L
+                actionMessages(
+                    "opencode_plan", args, r,
+                    if (failed) "OpenCode مقدرش يعمل خطة:\n$plan"
+                    else "خطة OpenCode (لسه ماتغيّرش حاجة):\n\n$plan\n\nقول «نفّذ» علشان يبدأ، أو اكتبله تعديلك.",
+                )
+            }
+            is LocalIntent.OpenCodeGo -> {
+                if (!com.myassistant.app.terminal.OpenCode.hasFreshPlan()) return null
+                val tool = tools["opencode_do"] ?: return null
+                val args = JSONObject().put("summary", "الخطة اللي OpenCode عملها")
+                val r = tool.execute(args, ctx)
+                com.myassistant.app.terminal.OpenCode.lastPlanAt = 0L
+                actionMessages("opencode_do", args, r, "OpenCode خلّص:\n\n" + r.substringAfter('\n').trim().takeLast(3000))
+            }
             is LocalIntent.AboutMe -> {
                 val items = withContext(Dispatchers.IO) { ctx.memory.recent(2000) }
                 listOf(reply(if (items.isEmpty()) "لسه معرفش عنك حاجة. احكيلي عن نفسك وأنا هفتكر." else aboutMe(items)))
@@ -286,40 +304,6 @@ class FastBrain(private val tools: ToolRegistry, private val ctx: ToolContext) {
     }
 
     /** Same shape the AI produces (call → result → reply), so the conversation stays consistent. */
-    /** OpenCode mode / "خلّي OpenCode …": straight to OpenCode, no AI model in between. */
-    suspend fun openCode(text: String): List<ChatMessage>? =
-        if (FastParser.parse(text) == LocalIntent.OpenCodeGo && com.myassistant.app.terminal.OpenCode.hasFreshPlan()) openCodeGo()
-        else openCodePlan(text)
-
-    private suspend fun openCodePlan(task: String): List<ChatMessage>? {
-        val tool = tools["opencode_plan"] ?: return null
-        val args = JSONObject().put("task", task)
-        val r = tool.execute(args, ctx)
-        val oc = com.myassistant.app.terminal.OpenCode
-        val text = oc.clean(r)
-        val failed = oc.lastPlanAt == 0L
-        val isPlan = !failed && oc.proposesChanges(text)
-        if (!isPlan) oc.lastPlanAt = 0L // just an answer: nothing to carry out
-        return actionMessages(
-            "opencode_plan", args, r,
-            when {
-                failed -> "OpenCode مقدرش يكمّل:\n${text.ifBlank { r.take(800) }}"
-                isPlan -> "$text\n\nقول «نفّذ» علشان يبدأ، أو اكتبله تعديلك."
-                else -> text.ifBlank { "OpenCode مارجّعش رد." }
-            },
-        )
-    }
-
-    private suspend fun openCodeGo(): List<ChatMessage>? {
-        val oc = com.myassistant.app.terminal.OpenCode
-        if (!oc.hasFreshPlan()) return null
-        val tool = tools["opencode_do"] ?: return null
-        val args = JSONObject().put("summary", "الخطة اللي OpenCode عملها")
-        val r = tool.execute(args, ctx)
-        oc.lastPlanAt = 0L
-        return actionMessages("opencode_do", args, r, oc.clean(r).takeLast(3000).ifBlank { "OpenCode خلّص." })
-    }
-
     private fun actionMessages(toolName: String, args: JSONObject, result: String, text: String): List<ChatMessage> {
         val call = ToolCall("local-" + newId(), toolName, args.toString())
         return listOf(

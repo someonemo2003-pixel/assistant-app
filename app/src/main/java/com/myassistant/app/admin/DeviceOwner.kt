@@ -89,10 +89,6 @@ object DeviceOwner {
         "com.cmcm.live" to listOf("LiveMe", "Live.me", "لايف مي"),
         "com.mico" to listOf("MICO", "ميكو"),
         "com.yy.hiyo" to listOf("Hago", "هاجو"),
-        // Short dramas / reels
-        "com.storymatrix.drama" to listOf("DramaBox", "Drama Box", "دراما بوكس", "دراما بوكس"),
-        "com.deepvision.shortdrama" to listOf("Drama Pops", "دراما بوبس"),
-        "com.netshort.abroad" to listOf("NetShort", "نت شورت"),
         // Not requested but common
         "com.twitter.android" to listOf("X", "Twitter", "تويتر"),
         "com.google.android.youtube" to listOf("YouTube", "يوتيوب"),
@@ -102,14 +98,6 @@ object DeviceOwner {
 
     /** Live-streaming apps found only by their store name (package not known for sure). */
     private val LIVE_NAMES = listOf("StreamKar", "Poppo Live", "BuzzCast", "Soulchill", "Kumu", "Ligo", "Yalla Live", "Chamet", "Tumile", "MeYo")
-
-    /** Short-drama and reels apps the user asked to block (2nd list, added once). */
-    private val REELS_PKGS = listOf("com.storymatrix.drama", "com.deepvision.shortdrama", "com.netshort.abroad")
-    private val REELS_NAMES = listOf(
-        "ReelShort", "ShortMax", "GoodShort", "FlexTV", "DramaWave", "MoboReels", "Playlet", "ShortTV", "StardustTV",
-        "Kalos TV", "DramaShorts", "My Drama", "TopShort", "iDrama", "FreeReels", "Kwai", "Snack Video", "Moj", "Josh",
-        "Triller", "Lemon8", "Chingari", "Zili", "Vigo Video",
-    )
 
     /** The user's own list (blocked from the first run of this version). */
     private val DEFAULT_BLOCKED = listOf(
@@ -121,25 +109,15 @@ object DeviceOwner {
         "com.asiainno.uplive", "com.cmcm.live", "com.mico", "com.yy.hiyo",
     )
 
-    /** Adds the default lists once each (keeps anything the user removed later removed). */
+    /** Adds the default list once (keeps anything the user unblocked later unblocked). */
     fun seedDefaults(ctx: Context) {
-        val p = prefs(ctx)
-        if (!p.getBoolean("seeded_v1", false)) {
-            seed(ctx, DEFAULT_BLOCKED, LIVE_NAMES)
-            p.edit().putBoolean("seeded_v1", true).apply()
-        }
-        if (!p.getBoolean("seeded_v2_reels", false)) {
-            seed(ctx, REELS_PKGS, REELS_NAMES)
-            p.edit().putBoolean("seeded_v2_reels", true).apply()
-        }
-    }
-
-    private fun seed(ctx: Context, pkgs: List<String>, names: List<String>) {
+        if (prefs(ctx).getBoolean("seeded_v1", false)) return
         val have = blocked(ctx)
-        val add = pkgs.filter { pk -> have.none { it.pkg == pk } }.map { BlockedApp(KNOWN[it]?.first() ?: it, it) } +
-            names.filter { n -> have.none { it.name.equals(n, true) } }.map { BlockedApp(it, null) }
+        val add = DEFAULT_BLOCKED.filter { p -> have.none { it.pkg == p } }.map { BlockedApp(KNOWN[it]?.first() ?: it, it) } +
+            LIVE_NAMES.filter { n -> have.none { it.name.equals(n, true) } }.map { BlockedApp(it, null) }
         // Two TikTok packages share a name: keep the name unique per package.
         save(ctx, (have + add).distinctBy { it.pkg ?: it.name })
+        prefs(ctx).edit().putBoolean("seeded_v1", true).apply()
         enforce(ctx)
     }
 
@@ -218,7 +196,7 @@ object DeviceOwner {
     fun browsersOnly(ctx: Context) = true
 
     /** Apps that can open any web link = browsers. */
-    fun browserPackages(ctx: Context): Set<String> = runCatching {
+    private fun browserPackages(ctx: Context): Set<String> = runCatching {
         val i = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://nova-browser-check.invalid/")).addCategory(Intent.CATEGORY_BROWSABLE)
         ctx.packageManager.queryIntentActivities(i, PackageManager.MATCH_ALL).map { it.activityInfo.packageName }.toSet()
     }.getOrDefault(emptySet())

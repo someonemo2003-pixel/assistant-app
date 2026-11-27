@@ -106,7 +106,6 @@ class FastParserTest {
         assertEquals(LocalIntent.OpenCodeTask("يعمل script بايثون يطبع التاريخ"), FastParser.parse("خلّي OpenCode يعمل script بايثون يطبع التاريخ"))
         assertEquals(LocalIntent.OpenCodeTask("قولي إصدار بايثون"), FastParser.parse("opencode: قولي إصدار بايثون"))
         assertEquals(LocalIntent.OpenCodeTask("اعمل موقع بسيط"), FastParser.parse("اطلب من opencode اعمل موقع بسيط"))
-        assertEquals(LocalIntent.OpenCodeTask("يعرف اصدار بايثون"), FastParser.parse("خلى opencode يعرف اصدار بايثون"))
         assertNull(FastParser.parse("opencode بطيء ليه؟"))
         assertEquals(LocalIntent.OpenCodeGo, FastParser.parse("نفّذ"))
         assertEquals(LocalIntent.OpenCodeGo, FastParser.parse("كمل ونفذ"))

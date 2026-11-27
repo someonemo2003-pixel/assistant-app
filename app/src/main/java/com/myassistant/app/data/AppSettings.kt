@@ -48,11 +48,6 @@ class AppSettings(context: Context) {
     val sessionChat = MutableStateFlow("")
     val sessionAction = MutableStateFlow("")
 
-    private val _chatMode = MutableStateFlow(com.myassistant.app.agent.ChatMode.of(prefs.getString(CHAT_MODE, null)))
-    /** Who handles messages: auto, just talk, the phone, or OpenCode (kept until the user changes it). */
-    val chatMode: StateFlow<com.myassistant.app.agent.ChatMode> = _chatMode.asStateFlow()
-    fun setChatMode(m: com.myassistant.app.agent.ChatMode) { prefs.edit().putString(CHAT_MODE, m.name).apply(); _chatMode.value = m }
-
     private val _opencodeModel = MutableStateFlow(prefs.getString(OC_MODEL, "") ?: "")
     /** Model OpenCode uses ("provider/model"; "" = OpenCode's own default). */
     val opencodeModel: StateFlow<String> = _opencodeModel.asStateFlow()
@@ -93,7 +88,6 @@ class AppSettings(context: Context) {
         const val SPEAK = "speak_replies"
         const val HANDS_FREE = "hands_free"
         const val CHAT_BRAIN = "chat_brain"
-        const val CHAT_MODE = "chat_mode"
         const val CONFIRM_SENDS = "confirm_sends"
         const val ACTION_BRAIN = "action_brain"
         const val OC_MODEL = "opencode_model"

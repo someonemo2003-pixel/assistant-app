@@ -53,22 +53,16 @@ private val Dark = darkColorScheme(
     onErrorContainer = Color(0xFFFFE1E3),
 )
 
-/** Material 3 Expressive shapes: rounder, softer corners. */
 private val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
 )
 
-/** Material 3 Expressive: springy motion everywhere (buttons, sheets, chips…), with Nova's own colours. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AssistantTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = Dark,
-        motionScheme = androidx.compose.material3.MotionScheme.expressive(),
         shapes = AppShapes,
         content = content,
     )

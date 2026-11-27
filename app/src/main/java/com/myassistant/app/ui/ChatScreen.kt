@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -207,8 +206,6 @@ fun ChatScreen(vm: AppViewModel) {
                     textAlign = TextAlign.Center,
                 )
             }
-            SlashSuggestions(input) { cmd -> input = ""; vm.runCommand(cmd) }
-            ModeRow(vm)
             VoiceBar(
                 listening = listen.listening,
                 partial = listen.partial,
@@ -429,67 +426,22 @@ private fun WorkingLine() {
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TypingIndicator() {
-    // Material 3 Expressive loading indicator: a shape that morphs while Nova works.
-    androidx.compose.material3.LoadingIndicator(
-        modifier = Modifier.size(40.dp),
-        color = MaterialTheme.colorScheme.primary,
+    val comp by com.airbnb.lottie.compose.rememberLottieComposition(
+        com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(com.myassistant.app.R.raw.nova_thinking),
     )
-}
-
-/** While the message starts with "/", shows the matching commands; a tap opens that page. */
-@Composable
-private fun SlashSuggestions(input: String, onPick: (String) -> Unit) {
-    val list = SlashCommands.matching(input)
-    if (list.isEmpty()) return
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        list.forEach { c ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onPick(c.command) }.padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(c.command, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.size(12.dp))
-                Text(c.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-/** Pick who handles the next messages: Nova decides, just talk, the phone, or OpenCode. */
-@Composable
-private fun ModeRow(vm: AppViewModel) {
-    val mode by vm.settings.chatMode.collectAsState()
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(start = 12.dp, end = 12.dp, top = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        com.myassistant.app.agent.ChatMode.entries.forEach { m ->
-            val on = m == mode
-            androidx.compose.material3.FilterChip(
-                selected = on,
-                onClick = { vm.settings.setChatMode(m) },
-                label = { Text(m.label, style = MaterialTheme.typography.labelLarge) },
-                colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.7f),
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-            )
-        }
-    }
-    if (mode != com.myassistant.app.agent.ChatMode.AUTO) {
-        Text(
-            mode.hint,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+        com.airbnb.lottie.compose.LottieAnimation(
+            composition = comp,
+            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+            modifier = Modifier.size(width = 54.dp, height = 18.dp),
         )
     }
 }

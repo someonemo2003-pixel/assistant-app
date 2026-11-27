@@ -67,6 +67,7 @@ class AssistantApp : Application() {
         private set
 
     override fun onCreate() {
+        CrashLog.install(this)
         super.onCreate()
         graph = AppGraph(this)
         graph.startBackground()
