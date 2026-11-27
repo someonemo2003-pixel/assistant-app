@@ -1,6 +1,8 @@
 package com.myassistant.app.ui
 
 import android.app.Application
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +25,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, BlockApps }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -137,6 +139,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun send(text: String, spoken: Boolean = false) {
         val t = text.trim()
         if (t.isEmpty() || busy) return
+        if (t.startsWith("/")) { runCommand(t); return }
         if (!spoken) stopVoice()
         val startIndex = messages.size
         error = null
@@ -155,6 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     history = messages.toMutableList(),
                     emit = { messages += it; persist(convId, it) },
                     confirm = { askConfirm(it) },
+                    mode = settings.chatMode.value,
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -168,6 +172,78 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (spoken && voiceMode) afterVoiceTurn(startIndex)
             }
         }
+    }
+
+    /** Chat commands that open a page ("/blockapps" …). */
+    fun runCommand(text: String) {
+        val cmd = text.trim().substringBefore(' ').lowercase()
+        when (SlashCommands.all.firstOrNull { it.command == cmd }?.command) {
+            "/blockapps" -> { screen = Screen.BlockApps; loadApps() }
+            else -> notice = "مفيش أمر اسمه $cmd"
+        }
+    }
+
+    // ---- /blockapps ----
+
+    data class AppRow(
+        val name: String,
+        val pkg: String?,
+        val cat: com.myassistant.app.admin.AppCat,
+        val blocked: Boolean,
+        val installed: Boolean,
+        val icon: androidx.compose.ui.graphics.ImageBitmap?,
+    )
+
+    var appRows by mutableStateOf<List<AppRow>>(emptyList())
+        private set
+    var appsLoading by mutableStateOf(false)
+        private set
+
+    fun loadApps() {
+        val ctx = getApplication<Application>()
+        appsLoading = true
+        viewModelScope.launch {
+            appRows = withContext(Dispatchers.IO) {
+                val DO = com.myassistant.app.admin.DeviceOwner
+                val cats = com.myassistant.app.admin.AppCategories
+                val pm = ctx.packageManager
+                val browsers = DO.browserPackages(ctx)
+                fun icon(pkg: String) = runCatching {
+                    pm.getApplicationIcon(pkg).toBitmap(96, 96).asImageBitmap()
+                }.getOrNull()
+                val blocked = DO.blocked(ctx)
+                val launcher = pm.queryIntentActivities(
+                    android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER), 0,
+                ).map { it.activityInfo.packageName to it.loadLabel(pm).toString() }.distinctBy { it.first }
+                    .filter { (p, _) ->
+                        p != ctx.packageName && runCatching {
+                            pm.getApplicationInfo(p, 0).flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0
+                        }.getOrDefault(false)
+                    }
+                val blockedRows = blocked.map { b ->
+                    val inst = b.pkg != null && launcher.any { it.first == b.pkg }
+                    AppRow(b.name, b.pkg, cats.of(ctx, b.pkg, b.name, browsers), true, inst, b.pkg?.takeIf { inst }?.let(::icon))
+                }
+                val free = launcher.filter { (p, label) -> blocked.none { it.pkg == p || (it.pkg == null && it.name.equals(label, true)) } }
+                    .map { (p, label) -> AppRow(label, p, cats.of(ctx, p, label, browsers), false, true, icon(p)) }
+                (blockedRows + free).sortedBy { it.name.lowercase() }
+            }
+            appsLoading = false
+        }
+    }
+
+    /** Blocks for good (there is no unblock), then refreshes the page. */
+    fun blockApp(name: String, pkg: String?) {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            notice = withContext(Dispatchers.IO) { com.myassistant.app.admin.DeviceOwner.block(ctx, name, pkg) }
+            loadApps()
+        }
+    }
+
+    fun moveApp(row: AppRow, cat: com.myassistant.app.admin.AppCat) {
+        com.myassistant.app.admin.AppCategories.move(getApplication(), row.pkg ?: row.name, cat)
+        appRows = appRows.map { if (it === row) it.copy(cat = cat) else it }
     }
 
     fun stop() {

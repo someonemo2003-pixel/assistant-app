@@ -144,6 +144,33 @@ object OpenCode {
     /** When the last plan was made (0 = none / failed / already carried out). */
     @Volatile var lastPlanAt: Long = 0L
 
+    /**
+     * OpenCode's raw output made readable for the chat: drops the exit code, the agent/model header,
+     * refused tool calls and the raw output of the commands it ran, so only its own words remain.
+     */
+    fun clean(raw: String): String {
+        val out = mutableListOf<String>()
+        var skipping = false
+        for (line in raw.lines()) {
+            val t = line.trim()
+            when {
+                t.startsWith("exit code:") || t.startsWith("> ") || t.startsWith("PLAN (nothing") -> Unit
+                t.startsWith("✗ ") || t.startsWith("Error: The user has specified a rule") -> Unit
+                t.startsWith("$ ") || t.startsWith("✓ ") -> skipping = true
+                skipping && t.isEmpty() -> skipping = false
+                skipping -> Unit
+                else -> if (!(t.isEmpty() && out.lastOrNull().isNullOrBlank())) out += line
+            }
+        }
+        return out.joinToString("\n").trim()
+    }
+
+    /** True when OpenCode proposed changes (steps to carry out), not just an answer. */
+    fun proposesChanges(text: String): Boolean =
+        Regex("""(?m)^\s*(\d+[.)]|[-*•])\s+\S""").containsMatchIn(text) &&
+            Regex("""create|write|install|modify|edit|add|delete|remove|run|اعمل|هعمل|هكتب|هثبت|هنشئ|إنشاء|تثبيت|تعديل|كتابة""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(text)
+
     /** A plan made in the last 30 minutes that hasn't been carried out yet. */
     fun hasFreshPlan() = lastPlanAt > 0 && System.currentTimeMillis() - lastPlanAt < 30 * 60_000
 
@@ -174,12 +201,16 @@ object OpenCode {
             .distinct()
     }
 
+    private const val PLAN_NOTE =
+        "\n\n(From the Nova app on the user's phone. Reply in short Egyptian Arabic. If this only needs information, " +
+            "find it and just answer. If it needs changes, reply with a short numbered plan of what you will do; nothing is changed yet.)"
+
     suspend fun run(ctx: android.content.Context, task: String, folder: String, model: String, plan: Boolean, onTick: (Int) -> Unit): Termux.Result {
         val flags = buildList {
             if (plan) { add("--agent"); add("plan") } else { add("--continue"); add("--agent"); add("build") }
             if (model.isNotBlank() && Regex("""^[A-Za-z0-9._/:-]+$""").matches(model)) { add("-m"); add(model) }
         }.joinToString(" ")
         val dir = folder.takeIf { Regex("""^[A-Za-z0-9._/~ -]+$""").matches(it) }?.replace("~", "/root").orEmpty()
-        return Termux.run(ctx, OUTER, listOf(task, flags, dir, INNER, CONFIG), timeoutSec = if (plan) 420 else 900, onTick = onTick)
+        return Termux.run(ctx, OUTER, listOf(if (plan) task + PLAN_NOTE else task, flags, dir, INNER, CONFIG), timeoutSec = if (plan) 420 else 900, onTick = onTick)
     }
 }
