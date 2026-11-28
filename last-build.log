@@ -1,0 +1,141 @@
+status: success
+120:    cos=0.9996  task: sentence similarity | query: صحيني
+121:    cos=0.9996  task: sentence similarity | query: عايز 
+122:    cos=0.9997  task: sentence similarity | query: اظبطل
+123:    cos=0.9997  task: sentence similarity | query: افتح 
+124:    cos=0.9996  task: sentence similarity | query: شغللي
+125:    cos=0.9998  task: sentence similarity | query: وضع ا
+126:    cos=0.9997  title: none | text: حجزت عند دكتور الأسن
+127:    cos=0.9997  title: none | text: عيد ميلاد أمي يوم 5 
+128:    cos=0.9995  Hello World, how are you?
+129:    cos=0.9996  مرحبا 😀 يا جماعة!!
+130:    cos=0.9996  الإيميل بتاع شركة X عن عرض السعر 1500 جن
+131:    cos=0.9993  ﷺ ﻻ ٱلرَّحْمَٰن
+132:    cos=0.9994     مسافات   كتير  
+133:    cos=0.9992  a	b
+135:    cos=0.9994  صحّيني
+136:    cos=0.9993  OpenRouter وGroq وGemini
+137:    avg ms: 239
+138:    alarm-vs-alarm=0.78726226 alarm-vs-youtube=0.55357856
+141:    tokenizer: 16/16 identical
+-----
+> Task :app:processDebugResources
+> Task :app:mergeReleaseResources FROM-CACHE
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease FROM-CACHE
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:extractProguardFiles
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseStartupProfile
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets FROM-CACHE
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:processReleaseResources
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:compileDebugKotlin
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ai/Http.kt:107:13 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ai/OpenAiCompatibleProvider.kt:91:28 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/control/ScreenService.kt:174:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AccessibilityNodeInfo'.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/control/ScreenService.kt:345:52 'var isChecked: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/fast/FastBrain.kt:80:101 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/fast/FastBrain.kt:238:43 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/mail/DailyReport.kt:227:64 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/tools/Tool.kt:121:68 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/tools/UsageTools.kt:18:13 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/MemoryScreen.kt:82:13 'fun TabRow(selectedTabIndex: Int, modifier: Modifier = ..., containerColor: Color = ..., contentColor: Color = ..., indicator: ComposableFunction1<List<TabPosition>, Unit> = ..., divider: ComposableFunction0<Unit> = ..., tabs: ComposableFunction0<Unit>): Unit' is deprecated. Replaced with PrimaryTabRow and SecondaryTabRow.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/MemoryScreen.kt:233:62 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:264:40 'constructor(mask: Char = ...): PasswordVisualTransformation' is deprecated. The TextField flavors that use VisualTransformation are deprecated. Please refer to BasicSecureTextField and other SecureTextField composables for password inputs.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:475:44 'constructor(mask: Char = ...): PasswordVisualTransformation' is deprecated. The TextField flavors that use VisualTransformation are deprecated. Please refer to BasicSecureTextField and other SecureTextField composables for password inputs.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:604:45 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/WebScreen.kt:101:54 'fun BasicTextField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = ..., enabled: Boolean = ..., readOnly: Boolean = ..., textStyle: TextStyle = ..., keyboardOptions: KeyboardOptions = ..., keyboardActions: KeyboardActions = ..., singleLine: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., visualTransformation: VisualTransformation = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., interactionSource: MutableInteractionSource? = ..., cursorBrush: Brush = ..., decorationBox: ComposableFunction1<ComposableFunction0<Unit>, Unit> = ...): Unit' is deprecated. Use the BasicTextField(state: TextFieldState, ...) overload instead. To migrate: create a TextFieldState via rememberTextFieldState(initialText) in composition or TextFieldState(initialText) in a state holder; read text from state.text and update it programmatically via state.edit { ... } or state.setTextAndPlaceCursorAtEnd(text); observe text changes for side effects via snapshotFlow { state.text }.collect { ... }; and replace onValueChange input filtering with InputTransformation, visualTransformation with OutputTransformation (or BasicSecureTextField for passwords), singleLine/maxLines/minLines with TextFieldLineLimits, decorationBox with TextFieldDecorator, and keyboardActions with KeyboardActionHandler. See https://developer.android.com/develop/ui/compose/text/migrate-state-based for full migration guidance.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/voice/Voice.kt:134:37 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/voice/Voice.kt:135:71 'constructor(p0: String!): Locale' is deprecated. Deprecated in Java.
+
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:mergeReleaseGeneratedProguardFiles
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ai/Http.kt:107:13 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ai/OpenAiCompatibleProvider.kt:91:28 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/control/ScreenService.kt:174:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AccessibilityNodeInfo'.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/control/ScreenService.kt:345:52 'var isChecked: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/fast/FastBrain.kt:80:101 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/fast/FastBrain.kt:238:43 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/mail/DailyReport.kt:227:64 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/tools/Tool.kt:121:68 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/tools/UsageTools.kt:18:13 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/MemoryScreen.kt:82:13 'fun TabRow(selectedTabIndex: Int, modifier: Modifier = ..., containerColor: Color = ..., contentColor: Color = ..., indicator: ComposableFunction1<List<TabPosition>, Unit> = ..., divider: ComposableFunction0<Unit> = ..., tabs: ComposableFunction0<Unit>): Unit' is deprecated. Replaced with PrimaryTabRow and SecondaryTabRow.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/MemoryScreen.kt:233:62 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:264:40 'constructor(mask: Char = ...): PasswordVisualTransformation' is deprecated. The TextField flavors that use VisualTransformation are deprecated. Please refer to BasicSecureTextField and other SecureTextField composables for password inputs.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:475:44 'constructor(mask: Char = ...): PasswordVisualTransformation' is deprecated. The TextField flavors that use VisualTransformation are deprecated. Please refer to BasicSecureTextField and other SecureTextField composables for password inputs.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/SettingsScreen.kt:604:45 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/ui/WebScreen.kt:101:54 'fun BasicTextField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = ..., enabled: Boolean = ..., readOnly: Boolean = ..., textStyle: TextStyle = ..., keyboardOptions: KeyboardOptions = ..., keyboardActions: KeyboardActions = ..., singleLine: Boolean = ..., maxLines: Int = ..., minLines: Int = ..., visualTransformation: VisualTransformation = ..., onTextLayout: (TextLayoutResult) -> Unit = ..., interactionSource: MutableInteractionSource? = ..., cursorBrush: Brush = ..., decorationBox: ComposableFunction1<ComposableFunction0<Unit>, Unit> = ...): Unit' is deprecated. Use the BasicTextField(state: TextFieldState, ...) overload instead. To migrate: create a TextFieldState via rememberTextFieldState(initialText) in composition or TextFieldState(initialText) in a state holder; read text from state.text and update it programmatically via state.edit { ... } or state.setTextAndPlaceCursorAtEnd(text); observe text changes for side effects via snapshotFlow { state.text }.collect { ... }; and replace onValueChange input filtering with InputTransformation, visualTransformation with OutputTransformation (or BasicSecureTextField for passwords), singleLine/maxLines/minLines with TextFieldLineLimits, decorationBox with TextFieldDecorator, and keyboardActions with KeyboardActionHandler. See https://developer.android.com/develop/ui/compose/text/migrate-state-based for full migration guidance.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/voice/Voice.kt:134:37 'constructor(p0: String!, p1: String!): Locale' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/assistant-app/assistant-app/app/src/main/java/com/myassistant/app/voice/Voice.kt:135:71 'constructor(p0: String!): Locale' is deprecated. Deprecated in Java.
+
+> Task :app:compressReleaseJavaRes FROM-CACHE
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:mergeReleaseJavaResource
+> Task :app:compressDebugJavaRes FROM-CACHE
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:compressDebugUnitTestJavaRes FROM-CACHE
+> Task :app:extractDebugUnitTestJavaRes
+> Task :app:produceReleaseComposeMapping
+
+> Task :app:testDebugUnitTest
+
+GemmaModelTest > embeddingsMatchReference STANDARD_OUT
+    cos=0.9996  task: sentence similarity | query: صحيني
+    cos=0.9996  task: sentence similarity | query: عايز 
+    cos=0.9997  task: sentence similarity | query: اظبطل
+    cos=0.9997  task: sentence similarity | query: افتح 
+    cos=0.9996  task: sentence similarity | query: شغللي
+    cos=0.9998  task: sentence similarity | query: وضع ا
+    cos=0.9997  title: none | text: حجزت عند دكتور الأسن
+    cos=0.9997  title: none | text: عيد ميلاد أمي يوم 5 
+    cos=0.9995  Hello World, how are you?
+    cos=0.9996  مرحبا 😀 يا جماعة!!
+    cos=0.9996  الإيميل بتاع شركة X عن عرض السعر 1500 جن
+    cos=0.9993  ﷺ ﻻ ٱلرَّحْمَٰن
+    cos=0.9994     مسافات   كتير  
+    cos=0.9992  a	b
+    c
+    cos=0.9994  صحّيني
+    cos=0.9993  OpenRouter وGroq وGemini
+    avg ms: 239
+    alarm-vs-alarm=0.78726226 alarm-vs-youtube=0.55357856
+
+GemmaModelTest > tokenizerMatchesHuggingFace STANDARD_OUT
+    tokenizer: 16/16 identical
+
+> Task :app:reportReleaseComposeMappingErrors
+> Task :app:minifyReleaseWithR8
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:mergeReleaseComposeMapping
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1795887474077.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/assistant-app/assistant-app/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 3m 41s
+75 actionable tasks: 51 executed, 24 from cache
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.9.3/userguide/configuration_cache_enabling.html
