@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,14 +55,27 @@ fun WebScreen(vm: AppViewModel) {
     var notice by remember { mutableStateOf<String?>(null) }
 
     fun go(raw: String) {
-        val url = raw.trim().let { if (it.startsWith("http")) it else "https://$it" }
+        val t = raw.trim()
+        if (t.isEmpty()) return
+        // Words without a dot = search on Google.
+        val url = when {
+            t.startsWith("http") -> t
+            '.' in t && ' ' !in t -> "https://$t"
+            else -> "https://www.google.com/search?q=" + android.net.Uri.encode(t)
+        }
         if (HiddenBrowser.isBlocked(ctx, url)) { notice = "الموقع ده محظور من /extension"; return }
         notice = null
         web.loadUrl(url)
     }
 
     LaunchedEffect(vm.webUrl) {
-        vm.webUrl?.let { address = it; go(it); vm.webUrl = null }
+        val asked = vm.webUrl
+        when {
+            asked != null -> { address = asked; go(asked); vm.webUrl = null }
+            // Nothing open yet: start at Google instead of a blank page.
+            web.url.isNullOrBlank() || web.url == "about:blank" -> { address = "google.com"; go("https://www.google.com") }
+            else -> address = web.url.orEmpty()
+        }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -96,6 +110,9 @@ fun WebScreen(vm: AppViewModel) {
                         placeholder = { Text("example.com") }, shape = RoundedCornerShape(24.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(onGo = { go(address) }),
+                        trailingIcon = {
+                            IconButton(onClick = { go(address) }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "افتح") }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -105,6 +122,8 @@ fun WebScreen(vm: AppViewModel) {
                 factory = {
                     (web.parent as? ViewGroup)?.removeView(web)
                     web.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                    web.setBackgroundColor(android.graphics.Color.WHITE)
+                    web.requestLayout()
                     web
                 },
                 modifier = Modifier.fillMaxSize(),
