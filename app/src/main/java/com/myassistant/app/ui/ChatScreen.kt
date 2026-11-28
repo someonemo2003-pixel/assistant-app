@@ -43,6 +43,15 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -137,65 +146,65 @@ fun ChatScreen(vm: AppViewModel) {
         noiseFactor = 0.04f,
     )
     Box(Modifier.fillMaxSize()) {
+    val wash = MaterialTheme.colorScheme.primaryContainer
+    Box(
+        Modifier.fillMaxSize().drawBehind {
+            drawRect(Brush.verticalGradient(
+                0f to Color.Transparent, 0.55f to Color.Transparent, 1f to wash.copy(alpha = 0.55f),
+            ))
+        },
+    )
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            CenterAlignedTopAppBar(
+            androidx.compose.material3.TopAppBar(
                 modifier = Modifier.hazeEffect(state = haze, style = glass),
+                navigationIcon = {
+                    IconButton(onClick = { vm.screen = Screen.Chats }) {
+                        Icon(Icons.Filled.Menu, "المحادثات", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
                 title = {
-                    // Tap the name to choose which model answers (like a model switcher).
+                    // Tap the model's name to switch (like Gemini's model menu).
                     val sChat by vm.settings.sessionChat.collectAsState()
                     val dChat by vm.settings.chatBrain.collectAsState()
-                    val current = configs.firstOrNull { it.id == sChat.ifEmpty { dChat } }?.name ?: "تلقائي"
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { pickerOpen = true }.padding(horizontal = 10.dp, vertical = 2.dp),
+                    val current = configs.firstOrNull { it.id == sChat.ifEmpty { dChat } }?.name ?: "Nova"
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).clickable { pickerOpen = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Nova", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge)
-                            Spacer(Modifier.size(8.dp))
-                            // green = ready, red = needs an API key
-                            Box(
-                                Modifier.size(7.dp).clip(CircleShape)
-                                    .background(if (readyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error),
-                            )
-                        }
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(50))
-                                .clickable { pickerOpen = true }
-                                .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(current, style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-                            Icon(Icons.Filled.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp))
+                        Text(current, style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 170.dp))
+                        Icon(Icons.Filled.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp))
+                        if (readyCount == 0) {
+                            Spacer(Modifier.size(6.dp))
+                            Box(Modifier.size(7.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error))
                         }
                     }
                 },
                 actions = {
+                    IconButton(onClick = { vm.newChat() }) {
+                        Icon(Icons.Filled.Edit, "محادثة جديدة", tint = MaterialTheme.colorScheme.onSurface)
+                    }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Filled.MoreVert, "القايمة", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(text = { Text("محادثة جديدة") }, leadingIcon = { Icon(Icons.Filled.Add, null) },
-                                onClick = { menuOpen = false; vm.newChat() })
-                            DropdownMenuItem(text = { Text("المحادثات") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, null) },
-                                onClick = { menuOpen = false; vm.screen = Screen.Chats })
                             DropdownMenuItem(text = { Text("بياناتي") }, leadingIcon = { Icon(Icons.Filled.AccountCircle, null) },
                                 onClick = { menuOpen = false; vm.screen = Screen.Memory })
+                            DropdownMenuItem(text = { Text("البرامج المحظورة") }, leadingIcon = { Icon(Icons.Filled.Lock, null) },
+                                onClick = { menuOpen = false; vm.runCommand("/blockapps") })
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
         bottomBar = {
-            Column(Modifier.hazeEffect(state = haze, style = glass)) {
+            Column {
             vm.notice?.let { n ->
                 Text(
                     n,
@@ -206,7 +215,7 @@ fun ChatScreen(vm: AppViewModel) {
                 )
             }
             SlashSuggestions(input) { cmd -> input = ""; vm.runCommand(cmd) }
-            ModeRow(vm)
+            ModeBadge(vm)
             VoiceBar(
                 listening = listen.listening,
                 partial = listen.partial,
@@ -226,6 +235,7 @@ fun ChatScreen(vm: AppViewModel) {
                 sendFlashKey = sendFlashKey,
                 onStop = { vm.stop() },
                 onMic = { if (listen.listening || speaking) vm.stopVoice() else onMic() },
+                vm = vm,
             )
             }
         },
@@ -440,20 +450,59 @@ private fun SlashSuggestions(input: String, onPick: (String) -> Unit) {
     val list = SlashCommands.matching(input)
     if (list.isEmpty()) return
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .heightIn(max = 280.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)
+            .shadow(4.dp, RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .heightIn(max = 300.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(vertical = 6.dp),
     ) {
         list.forEach { c ->
             Row(
-                Modifier.fillMaxWidth().clickable { onPick(c.command) }.padding(horizontal = 18.dp, vertical = 14.dp),
+                Modifier.fillMaxWidth().clickable { onPick(c.command) }.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(c.command, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.size(12.dp))
-                Text(c.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        when (c.command) {
+                            "/blockapps" -> Icons.Filled.Lock
+                            "/update" -> Icons.Filled.Refresh
+                            else -> Icons.Filled.Edit
+                        },
+                        null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(Modifier.size(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(c.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                    // Commands are Latin: keep them left-to-right so "/" stays in front and never wraps.
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Text(
+                            c.command,
+                            style = MaterialTheme.typography.bodySmall.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false,
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+/** Shows the chosen mode when it isn't automatic; tap to go back to automatic. */
+@Composable
+private fun ModeBadge(vm: AppViewModel) {
+    val mode by vm.settings.chatMode.collectAsState()
+    if (mode == com.myassistant.app.agent.ChatMode.AUTO) return
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
+        androidx.compose.material3.InputChip(
+            selected = true,
+            onClick = { vm.settings.setChatMode(com.myassistant.app.agent.ChatMode.AUTO) },
+            label = { Text("الوضع: ${mode.label}") },
+            trailingIcon = { Icon(Icons.Filled.Close, "رجوع للتلقائي", modifier = Modifier.size(16.dp)) },
+        )
     }
 }
 
@@ -502,62 +551,70 @@ private fun InputBar(
     sendFlashKey: Int,
     onStop: () -> Unit,
     onMic: () -> Unit,
+    vm: AppViewModel,
 ) {
-    val sendFlash = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(sendFlashKey) {
-        if (sendFlashKey > 0) {
-            sendFlash.snapTo(1f)
-            sendFlash.animateTo(0f, animationSpec = tween(520))
-        }
-    }
-    val sendFlashColor = MaterialTheme.colorScheme.primary
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .imePadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    var plus by remember { mutableStateOf(false) }
+    val mode by vm.settings.chatMode.collectAsState()
+    Box(
+        Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .drawBehind {
-                    if (sendFlash.value > 0f) {
-                        drawRoundRect(
-                            color = sendFlashColor.copy(alpha = sendFlash.value * 0.16f),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .shadow(6.dp, RoundedCornerShape(32.dp))
+                .clip(RoundedCornerShape(32.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box {
+                IconButton(onClick = { plus = true }) { Icon(Icons.Filled.Add, "الوضع", tint = MaterialTheme.colorScheme.onSurface) }
+                DropdownMenu(expanded = plus, onDismissRequest = { plus = false }) {
+                    com.myassistant.app.agent.ChatMode.entries.forEach { m ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(m.label, style = MaterialTheme.typography.bodyLarge)
+                                    Text(m.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            trailingIcon = { if (m == mode) Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                            onClick = { vm.settings.setChatMode(m); plus = false },
                         )
                     }
                 }
-                .semantics { contentDescription = "اكتب رسالة" },
-            shape = RoundedCornerShape(26.dp),
-            maxLines = 5,
-            colors = TextFieldDefaults.colors(
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                cursorColor = MaterialTheme.colorScheme.primary,
-            ),
-        )
-        Spacer(Modifier.size(10.dp))
-        when {
-            busy -> RoundButton(onStop) { Icon(Icons.Filled.Close, "إيقاف", tint = MaterialTheme.colorScheme.onPrimary) }
-            value.isNotBlank() -> RoundButton(onSend) { Icon(Icons.AutoMirrored.Filled.Send, "إرسال", tint = MaterialTheme.colorScheme.onPrimary) }
-            else -> androidx.compose.material3.FilledTonalIconButton(
-                onClick = onMic,
-                modifier = Modifier.size(52.dp),
+            }
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = { Text("اسأل Nova", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                modifier = Modifier.weight(1f).semantics { contentDescription = "اكتب رسالة" },
+                maxLines = 5,
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                ),
+            )
+            if (!busy && value.isBlank()) {
+                IconButton(onClick = onMic) {
+                    Icon(if (listening || speaking) Icons.Filled.Close else Icons.Filled.Mic, "اتكلم مع Nova",
+                        tint = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Spacer(Modifier.size(4.dp))
+            androidx.compose.material3.FilledTonalIconButton(
+                onClick = { when { busy -> onStop(); value.isNotBlank() -> onSend(); else -> onMic() } },
+                modifier = Modifier.size(48.dp),
             ) {
-                Icon(
-                    if (listening || speaking) Icons.Filled.Close else Icons.Filled.Mic,
-                    contentDescription = "اتكلم مع Nova",
-                )
+                when {
+                    busy -> Icon(Icons.Filled.Close, "إيقاف")
+                    value.isNotBlank() -> Icon(Icons.AutoMirrored.Filled.Send, "إرسال")
+                    else -> Icon(Icons.Filled.GraphicEq, "محادثة صوتية")
+                }
             }
         }
     }
@@ -669,10 +726,20 @@ private fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        NovaRing(size = 200.dp, active = active)
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(com.myassistant.app.R.drawable.ic_launcher_fg),
+            contentDescription = null,
+            modifier = Modifier.size(96.dp),
+        )
+        Text(
+            "نبدأ منين؟",
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
         if (needsKey) {
-            Spacer(Modifier.height(28.dp))
-            androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API من الإعدادات", color = MaterialTheme.colorScheme.primary) }
+            Spacer(Modifier.height(20.dp))
+            androidx.compose.material3.TextButton(onClick = openSettings) { Text("حط مفتاح API الأول", color = MaterialTheme.colorScheme.primary) }
         }
     }
 }
