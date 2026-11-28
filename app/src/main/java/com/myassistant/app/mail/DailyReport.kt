@@ -96,7 +96,7 @@ object DailyReport {
         out.appendLine("NOW: " + SimpleDateFormat("EEEE HH:mm", Locale.US).format(Date(now)) + " (report covers the last ${hours}h)").appendLine()
 
         if ("email" in sources) {
-            val mailClient = graph.mail.client()
+            val mailClient = graph.mail.backend(ctx)
             if (mailClient != null) {
                 val emails = withContext(Dispatchers.IO) { runCatching { mailClient.recent(since, limit = 60) }.getOrNull() }
                 var text = emails?.let { formatList(it) } ?: "(could not read Gmail)"

@@ -241,6 +241,17 @@ private fun MailCard(vm: AppViewModel) {
 
     Text("Gmail", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Spacer(Modifier.size(8.dp))
+    GoogleConnectCard(
+        com.myassistant.app.google.GoogleAuth.Service.GMAIL,
+        connectedText = "مربوط بحساب جوجل. Nova بيقرا الإيميل ويرتبه ويكتب مسودات، والإرسال دايمًا بعد موافقتك.",
+        notConnectedText = "اربط حساب جوجل علشان Nova يقرا الإيميل ويرد ويرتب من غير App Password.",
+        test = { ctx -> "اتربط. في صندوق الوارد ${kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.myassistant.app.mail.GmailApi(com.myassistant.app.google.GoogleAuth.token(ctx, com.myassistant.app.google.GoogleAuth.Service.GMAIL)).test()
+        }} رسالة." },
+    )
+    Spacer(Modifier.size(12.dp))
+    Text("أو بـ App Password (طريقة قديمة)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.size(8.dp))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -710,39 +721,53 @@ private fun ReportCard(vm: AppViewModel) {
 /** Connect Google Tasks with the phone's Google account (Google's own screen; no password in Nova). */
 @Composable
 private fun GoogleTasksCard() {
+    Text("Google Tasks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.size(8.dp))
+    GoogleConnectCard(
+        com.myassistant.app.google.GoogleAuth.Service.TASKS,
+        connectedText = "مربوط. قول لـ Nova مثلًا: ضيف مهمة أذاكر فصل 3 بكرة الساعة 5.",
+        notConnectedText = "اربط حساب جوجل علشان Nova يضيف مهامك ويقراها ويخلّصها في Google Tasks.",
+        test = { ctx -> "اتربط. لقيت ${com.myassistant.app.gtasks.GoogleTasks.lists(ctx).size} قايمة." },
+    )
+}
+
+/** One Google service: connect with Google's own screen, try it, disconnect. */
+@Composable
+private fun GoogleConnectCard(
+    service: com.myassistant.app.google.GoogleAuth.Service,
+    connectedText: String,
+    notConnectedText: String,
+    test: suspend (android.content.Context) -> String,
+) {
+    val G = com.myassistant.app.google.GoogleAuth
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    var connected by remember { mutableStateOf(com.myassistant.app.gtasks.GoogleTasks.connected(ctx)) }
-    var account by remember { mutableStateOf(com.myassistant.app.gtasks.GoogleTasks.account(ctx)) }
+    var connected by remember { mutableStateOf(G.connected(ctx, service)) }
+    var account by remember { mutableStateOf(G.account(ctx, service)) }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     suspend fun afterToken() {
-        status = runCatching {
-            val n = com.myassistant.app.gtasks.GoogleTasks.lists(ctx).size
-            "اتربط. لقيت $n قايمة."
-        }.getOrElse { "اتربط، بس فيه مشكلة: ${it.message}" }
-        connected = com.myassistant.app.gtasks.GoogleTasks.connected(ctx)
-        account = com.myassistant.app.gtasks.GoogleTasks.account(ctx)
+        status = runCatching { test(ctx) }.getOrElse { "اتربط، بس فيه مشكلة: ${it.message}" }
+        connected = G.connected(ctx, service)
+        account = G.account(ctx, service)
+        busy = false
     }
 
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
     ) { res ->
-        when (val a = com.myassistant.app.gtasks.GoogleTasks.fromIntent(ctx, res.data)) {
-            is com.myassistant.app.gtasks.GoogleTasks.Auth.Token -> scope.launch { afterToken(); busy = false }
-            is com.myassistant.app.gtasks.GoogleTasks.Auth.Failed -> { status = "ما اتربطش: ${a.why}"; busy = false }
+        when (val a = G.fromIntent(ctx, service, res.data)) {
+            is com.myassistant.app.google.GoogleAuth.Auth.Token -> scope.launch { afterToken() }
+            is com.myassistant.app.google.GoogleAuth.Auth.Failed -> { status = "ما اتربطش: ${a.why}"; busy = false }
             else -> busy = false
         }
     }
 
-    Text("Google Tasks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Spacer(Modifier.size(8.dp))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                if (connected) "مربوط" + (if (account.isNotBlank()) " بـ $account" else "") + ". قول لـ Nova مثلًا: ضيف مهمة أذاكر فصل 3 بكرة الساعة 5."
-                else "اربط حساب جوجل علشان Nova يضيف مهامك ويقراها ويخلّصها في Google Tasks.",
+                if (connected) (if (account.isNotBlank()) "$account\n" else "") + connectedText else notConnectedText,
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -750,19 +775,19 @@ private fun GoogleTasksCard() {
                     busy = true
                     status = "بيفتح جوجل…"
                     scope.launch {
-                        when (val a = com.myassistant.app.gtasks.GoogleTasks.authorize(ctx)) {
-                            is com.myassistant.app.gtasks.GoogleTasks.Auth.Token -> { afterToken(); busy = false }
-                            is com.myassistant.app.gtasks.GoogleTasks.Auth.NeedsUser -> launcher.launch(
+                        when (val a = G.authorize(ctx, service)) {
+                            is com.myassistant.app.google.GoogleAuth.Auth.Token -> afterToken()
+                            is com.myassistant.app.google.GoogleAuth.Auth.NeedsUser -> launcher.launch(
                                 androidx.activity.result.IntentSenderRequest.Builder(a.intent.intentSender).build(),
                             )
-                            is com.myassistant.app.gtasks.GoogleTasks.Auth.Failed -> { status = "ما اتربطش: ${a.why}"; busy = false }
+                            is com.myassistant.app.google.GoogleAuth.Auth.Failed -> { status = "ما اتربطش: ${a.why}"; busy = false }
                         }
                     }
-                }) { Text(if (connected) "جرّب الربط" else "اربط") }
+                }) { Text(if (connected) "جرّب الربط" else "اربط بحساب جوجل") }
                 if (connected) {
-                    TextButton(onClick = {
-                        com.myassistant.app.gtasks.GoogleTasks.disconnect(ctx); connected = false; account = ""; status = "اتشال الربط من Nova"
-                    }) { Text("فصل", color = MaterialTheme.colorScheme.error) }
+                    TextButton(onClick = { G.disconnect(ctx, service); connected = false; account = ""; status = "اتشال الربط من Nova" }) {
+                        Text("فصل", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

@@ -1,22 +1,14 @@
 package com.myassistant.app.gtasks
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import com.google.android.gms.auth.api.identity.AuthorizationRequest
-import com.google.android.gms.auth.api.identity.AuthorizationResult
-import com.google.android.gms.auth.api.identity.Identity
-import com.google.android.gms.common.api.Scope
 import com.myassistant.app.ai.Http
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URLEncoder
-import kotlin.coroutines.resume
 
 /**
  * Google Tasks, straight through Google's Tasks API. Sign-in uses the phone's Google account
@@ -24,8 +16,7 @@ import kotlin.coroutines.resume
  * for again each time (Google keeps it), so nothing secret is stored here.
  */
 object GoogleTasks {
-    private const val SCOPE = "https://www.googleapis.com/auth/tasks"
-    private const val API = "https://tasks.googleapis.com/tasks/v1"
+        private const val API = "https://tasks.googleapis.com/tasks/v1"
 
     class NotConnected : Exception("Google Tasks مش مربوط")
     class ApiError(msg: String) : Exception(msg)
@@ -33,43 +24,17 @@ object GoogleTasks {
     data class TaskList(val id: String, val title: String)
     data class Task(val id: String, val listId: String, val title: String, val notes: String, val due: String?, val done: Boolean)
 
-    private fun prefs(ctx: Context) = ctx.getSharedPreferences("gtasks", Context.MODE_PRIVATE)
-    fun connected(ctx: Context) = prefs(ctx).getBoolean("connected", false)
-    fun account(ctx: Context) = prefs(ctx).getString("account", "").orEmpty()
-    fun disconnect(ctx: Context) = prefs(ctx).edit().clear().apply()
+    private val S = com.myassistant.app.google.GoogleAuth.Service.TASKS
+    fun connected(ctx: Context) = com.myassistant.app.google.GoogleAuth.connected(ctx, S)
+    fun account(ctx: Context) = com.myassistant.app.google.GoogleAuth.account(ctx, S)
+    fun disconnect(ctx: Context) = com.myassistant.app.google.GoogleAuth.disconnect(ctx, S)
 
-    private fun request() = AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(SCOPE))).build()
-
-    /** Asks Google for access. Either a token, or a screen the user must see first (consent / pick account). */
-    sealed class Auth {
-        data class Token(val token: String) : Auth()
-        data class NeedsUser(val intent: PendingIntent) : Auth()
-        data class Failed(val why: String) : Auth()
-    }
-
-    suspend fun authorize(ctx: Context): Auth = suspendCancellableCoroutine { cont ->
-        Identity.getAuthorizationClient(ctx.applicationContext).authorize(request())
-            .addOnSuccessListener { r -> cont.resume(fromResult(ctx, r)) }
-            .addOnFailureListener { e -> cont.resume(Auth.Failed(e.message ?: e.javaClass.simpleName)) }
-    }
-
-    /** Result of Google's consent screen. */
-    fun fromIntent(ctx: Context, data: Intent?): Auth = runCatching {
-        fromResult(ctx, Identity.getAuthorizationClient(ctx.applicationContext).getAuthorizationResultFromIntent(data))
-    }.getOrElse { Auth.Failed(it.message ?: "اتلغى") }
-
-    private fun fromResult(ctx: Context, r: AuthorizationResult): Auth {
-        if (r.hasResolution()) return r.pendingIntent?.let { Auth.NeedsUser(it) } ?: Auth.Failed("no consent screen")
-        val token = r.accessToken ?: return Auth.Failed("no token")
-        prefs(ctx).edit().putBoolean("connected", true)
-            .putString("account", r.toGoogleSignInAccount()?.email.orEmpty()).apply()
-        return Auth.Token(token)
-    }
-
-    private suspend fun token(ctx: Context): String = when (val a = authorize(ctx)) {
-        is Auth.Token -> a.token
-        is Auth.NeedsUser -> { prefs(ctx).edit().putBoolean("connected", false).apply(); throw NotConnected() }
-        is Auth.Failed -> throw ApiError(a.why)
+    private suspend fun token(ctx: Context): String = try {
+        com.myassistant.app.google.GoogleAuth.token(ctx, S)
+    } catch (_: com.myassistant.app.google.GoogleAuth.NotConnected) {
+        throw NotConnected()
+    } catch (e: java.io.IOException) {
+        throw ApiError(e.message ?: "sign-in failed")
     }
 
     private suspend fun call(ctx: Context, method: String, path: String, body: JSONObject? = null): JSONObject {

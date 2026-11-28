@@ -45,6 +45,7 @@ data class MailItem(
 
 /** Gmail address + app password (encrypted) for the "hub" inbox. */
 class MailConfig(context: Context, private val secrets: SecretStore) {
+    private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("mail", Context.MODE_PRIVATE)
     private val _email = MutableStateFlow(prefs.getString("email", "").orEmpty())
     val email: StateFlow<String> = _email.asStateFlow()
@@ -65,6 +66,18 @@ class MailConfig(context: Context, private val secrets: SecretStore) {
         secrets.put("gmail_app_password", null)
     }
 
+    /** Gmail through the Google sign-in when connected, otherwise IMAP with the App Password. */
+    suspend fun backend(ctx: Context): MailBackend? {
+        val s = com.myassistant.app.google.GoogleAuth.Service.GMAIL
+        if (com.myassistant.app.google.GoogleAuth.connected(ctx, s)) {
+            val token = runCatching { com.myassistant.app.google.GoogleAuth.token(ctx, s) }.getOrNull()
+            if (token != null) return GmailApi(token)
+        }
+        return client()
+    }
+
+    val apiConnected get() = com.myassistant.app.google.GoogleAuth.connected(appContext, com.myassistant.app.google.GoogleAuth.Service.GMAIL)
+
     fun client(): MailClient? {
         val p = password() ?: return null
         if (_email.value.isBlank()) return null
@@ -72,8 +85,19 @@ class MailConfig(context: Context, private val secrets: SecretStore) {
     }
 }
 
-/** Talks to Gmail directly over IMAP/SMTP (no app is opened). All calls are blocking — use from IO. */
-class MailClient(private val address: String, private val appPassword: String) {
+/** One way to reach the Gmail inbox. All calls are blocking: use from IO. */
+interface MailBackend {
+    /** Number of messages in the inbox; throws with a readable message if login fails. */
+    fun test(): Int
+    fun recent(sinceMs: Long, unreadOnly: Boolean = false, query: String = "", limit: Int = 30): List<MailItem>
+    fun read(uid: Long): String
+    fun markRead(uids: List<Long>?, allUnread: Boolean): Int
+    fun send(to: String, subject: String, body: String, replyToUid: Long?): String
+    fun draft(to: String, subject: String, body: String, replyToUid: Long?): String
+}
+
+/** Talks to Gmail directly over IMAP/SMTP with an App Password (no app is opened). */
+class MailClient(private val address: String, private val appPassword: String) : MailBackend {
 
     private val props = Properties().apply {
         put("mail.store.protocol", "imaps")
@@ -108,9 +132,9 @@ class MailClient(private val address: String, private val appPassword: String) {
     }
 
     /** Throws with a readable message if login fails. */
-    fun test(): Int = inbox { it.messageCount }
+    override fun test(): Int = inbox { it.messageCount }
 
-    fun recent(sinceMs: Long, unreadOnly: Boolean = false, query: String = "", limit: Int = 30): List<MailItem> = inbox { f ->
+    override fun recent(sinceMs: Long, unreadOnly: Boolean, query: String, limit: Int): List<MailItem> = inbox { f ->
         var term: SearchTerm = ReceivedDateTerm(ComparisonTerm.GE, Date(sinceMs))
         if (unreadOnly) term = AndTerm(term, FlagTerm(Flags(Flags.Flag.SEEN), false))
         if (query.isNotBlank()) {
@@ -127,7 +151,7 @@ class MailClient(private val address: String, private val appPassword: String) {
         msgs.mapIndexed { i, m -> toItem(f, m, withSnippet = i < 25) }
     }
 
-    fun read(uid: Long): String = inbox { f ->
+    override fun read(uid: Long): String = inbox { f ->
         val m = f.getMessageByUID(uid) ?: return@inbox "Email not found"
         val item = toItem(f, m, withSnippet = false)
         val attachments = mutableListOf<String>()
@@ -143,7 +167,7 @@ class MailClient(private val address: String, private val appPassword: String) {
         }
     }
 
-    fun markRead(uids: List<Long>?, allUnread: Boolean): Int = inbox(write = true) { f ->
+    override fun markRead(uids: List<Long>?, allUnread: Boolean): Int = inbox(write = true) { f ->
         val msgs: Array<Message> = if (allUnread) f.search(FlagTerm(Flags(Flags.Flag.SEEN), false))
         else uids.orEmpty().mapNotNull { f.getMessageByUID(it) }.toTypedArray()
         if (msgs.isNotEmpty()) f.setFlags(msgs, Flags(Flags.Flag.SEEN), true)
@@ -175,14 +199,14 @@ class MailClient(private val address: String, private val appPassword: String) {
         return msg
     }
 
-    fun send(to: String, subject: String, body: String, replyToUid: Long?): String {
+    override fun send(to: String, subject: String, body: String, replyToUid: Long?): String {
         val msg = compose(to, subject, body, replyToUid)
         Transport.send(msg, address, appPassword)
         return "Sent to ${msg.allRecipients?.joinToString()}"
     }
 
     /** Saves to Gmail's Drafts folder so the user can review and send it from Gmail. */
-    fun draft(to: String, subject: String, body: String, replyToUid: Long?): String {
+    override fun draft(to: String, subject: String, body: String, replyToUid: Long?): String {
         val msg = compose(to, subject, body, replyToUid)
         val store = session.getStore("imaps") as IMAPStore
         store.connect("imap.gmail.com", address, appPassword)

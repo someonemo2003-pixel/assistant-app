@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val NOT_SET = "Gmail is not connected. Tell the user: → Gmail (email + App Password)."
+private const val NOT_SET = "Gmail is not connected. Open setup section 'gmail' (open_setup) and tell the user to tap 'اربط بحساب جوجل'."
 
 internal fun formatList(items: List<MailItem>): String {
     if (items.isEmpty()) return "No emails"
@@ -23,11 +23,13 @@ internal fun formatList(items: List<MailItem>): String {
     }
 }
 
-private suspend fun <T> mail(ctx: ToolContext, block: (MailClient) -> T): Any? {
-    val c = ctx.mail?.client() ?: return NOT_SET
+private suspend fun <T> mail(ctx: ToolContext, block: (MailBackend) -> T): Any? {
+    val c = ctx.mail?.backend(ctx.app) ?: return NOT_SET
     return withContext(Dispatchers.IO) {
         try {
             block(c)
+        } catch (e: GmailApi.ApiError) {
+            "Gmail error: ${e.message}"
         } catch (e: javax.mail.AuthenticationFailedException) {
             "Gmail login failed: check the email and App Password in → Gmail."
         } catch (e: Exception) {
