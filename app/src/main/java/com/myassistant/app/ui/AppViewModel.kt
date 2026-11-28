@@ -25,7 +25,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, BlockApps, Browser }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, BlockApps, Browser, Web }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -48,6 +48,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Which setup panel the Settings screen shows: providers | gmail | backup. */
     var setupSection by mutableStateOf("providers")
 
+    /** Address for Nova's browser page to open next. */
+    var webUrl by mutableStateOf<String?>(null)
+
     init {
         viewModelScope.launch {
             UiRequests.open.collect { s ->
@@ -57,7 +60,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     "learned" -> screen = Screen.Learned
                     "chats" -> screen = Screen.Chats
                     "data" -> screen = Screen.Memory
-                    else -> { setupSection = s; screen = Screen.Settings }
+                    "web" -> screen = Screen.Web
+                    else -> if (s.startsWith("web:")) { webUrl = s.removePrefix("web:"); screen = Screen.Web }
+                        else { setupSection = s; screen = Screen.Settings }
                 }
                 UiRequests.consume()
             }
@@ -183,7 +188,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "/chats" -> screen = Screen.Chats
             "/models" -> modelPickerRequest = true
             "/blockapps" -> { screen = Screen.BlockApps; loadApps() }
-            "/extension", "/browser", "/sites" -> screen = Screen.Browser
+            "/extension", "/sites" -> screen = Screen.Browser
+            "/web" -> screen = Screen.Web
             "/tasks" -> { setupSection = "tasks"; screen = Screen.Settings }
             "/memory" -> screen = Screen.Memory
             "/learned" -> screen = Screen.Learned

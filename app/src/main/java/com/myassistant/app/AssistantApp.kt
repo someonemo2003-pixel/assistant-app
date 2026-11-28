@@ -126,6 +126,8 @@ class AppGraph(context: Context) {
         // device
         com.myassistant.app.mail.ReportTool(), com.myassistant.app.mail.CheckEmailTool(), com.myassistant.app.mail.SearchEmailTool(), com.myassistant.app.mail.ReadEmailTool(),
         com.myassistant.app.mail.MarkEmailReadTool(), com.myassistant.app.mail.DraftEmailTool(), com.myassistant.app.mail.SendEmailTool(),
+        com.myassistant.app.web.WebSearchTool(), com.myassistant.app.web.WebOpenTool(), com.myassistant.app.web.WebReadTool(),
+        com.myassistant.app.web.WebClickTool(), com.myassistant.app.web.WebTypeTool(), com.myassistant.app.web.OpenWebPageTool(),
         com.myassistant.app.gtasks.TasksListTool(), com.myassistant.app.gtasks.TasksAddTool(), com.myassistant.app.gtasks.TasksDoneTool(),
         com.myassistant.app.reminders.AddReminderTool(), com.myassistant.app.reminders.ListRemindersTool(),
         com.myassistant.app.reminders.CancelReminderTool(), com.myassistant.app.reminders.SavePlaceTool(),

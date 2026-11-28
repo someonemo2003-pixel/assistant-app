@@ -8,6 +8,7 @@ object SlashCommands {
         Command("/blockapps", "البرامج المحظورة"),
         Command("/extension", "المتصفح والمواقع"),
         Command("/tasks", "Google Tasks"),
+        Command("/web", "متصفح Nova"),
         Command("/update", "شوف فيه تحديث"),
     )
 

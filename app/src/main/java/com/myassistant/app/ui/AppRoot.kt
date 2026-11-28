@@ -41,6 +41,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
                 Screen.Permissions -> PermissionsScreen(vm)
                 Screen.BlockApps -> BlockAppsScreen(vm)
                 Screen.Browser -> BrowserScreen(vm)
+                Screen.Web -> WebScreen(vm)
             }
         }
     }
