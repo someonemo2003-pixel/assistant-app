@@ -25,7 +25,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, BlockApps }
+enum class Screen { Chat, Settings, Memory, Chats, Learned, Permissions, BlockApps, Browser }
 
 class ConfirmRequest(val text: String, val answer: (Boolean) -> Unit)
 
@@ -183,6 +183,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "/chats" -> screen = Screen.Chats
             "/models" -> modelPickerRequest = true
             "/blockapps" -> { screen = Screen.BlockApps; loadApps() }
+            "/extension", "/browser", "/sites" -> screen = Screen.Browser
             "/memory" -> screen = Screen.Memory
             "/learned" -> screen = Screen.Learned
             "/permissions" -> screen = Screen.Permissions

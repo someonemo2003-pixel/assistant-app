@@ -161,6 +161,8 @@ class AppGraph(context: Context) {
     private val appContext = context.applicationContext
 
     fun startBackground() {
+        runCatching { com.myassistant.app.admin.DeviceOwner.watchInstalls(appContext) }
+        runCatching { com.myassistant.app.admin.BrowserPolicy.apply(appContext) }
         runCatching { com.myassistant.app.mail.DailyReport.schedule(appContext) }
         runCatching { com.myassistant.app.admin.DeviceOwner.seedDefaults(appContext) }
         runCatching { com.myassistant.app.admin.DeviceOwner.protectSelf(appContext); com.myassistant.app.admin.DeviceOwner.enforce(appContext) }

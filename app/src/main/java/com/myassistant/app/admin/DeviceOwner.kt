@@ -199,17 +199,17 @@ object DeviceOwner {
         if (browsersOnly(ctx)) forbiddenBrowsers(ctx).forEach { remove(ctx, it) }
     }
 
-    // ---------- browsers: only Chrome, Edge and the phone's own ----------
+    // ---------- browsers: only Chrome, Edge (and Edge Canary, for extensions) and the phone's own ----------
 
     /** Browsers that stay allowed besides the phone's built-in (system) ones. */
-    private val ALLOWED_BROWSERS = setOf("com.android.chrome", "com.microsoft.emmx", "com.google.android.googlequicksearchbox")
+    private val ALLOWED_BROWSERS = setOf("com.android.chrome", "com.microsoft.emmx", "com.microsoft.emmx.canary", "com.google.android.googlequicksearchbox")
 
     /** Store names of other browsers, so their install button gets covered in the store. */
     private val BROWSER_NAMES = listOf(
         "Firefox", "Firefox Focus", "Firefox Nightly", "Firefox Beta", "Opera", "Opera Mini", "Opera GX", "Opera Touch",
         "Brave", "DuckDuckGo", "Samsung Internet", "UC Browser", "UC Mini", "Vivaldi", "Tor Browser", "Yandex", "Yandex Browser",
         "Kiwi Browser", "Mi Browser", "Puffin", "Dolphin", "Via Browser", "Ecosia", "Aloha", "Phoenix Browser", "Mint Browser",
-        "Chrome Beta", "Chrome Dev", "Chrome Canary", "Edge Beta", "Edge Dev", "Edge Canary", "Mull", "Cromite", "Bromite",
+        "Chrome Beta", "Chrome Dev", "Chrome Canary", "Edge Beta", "Edge Dev", "Mull", "Cromite", "Bromite",
         "Hermit", "Lemur Browser", "Quetta", "Maxthon", "Avast Secure Browser", "AVG Secure Browser", "Aloha Browser",
     )
 
@@ -240,8 +240,15 @@ object DeviceOwner {
     fun storeBlocked(ctx: Context): List<BlockedApp> =
         blocked(ctx) + if (browsersOnly(ctx)) BROWSER_NAMES.map { BlockedApp(it, null) } else emptyList()
 
-    /** Called when an app gets installed. */
+    private val lastHandled = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** Called when an app gets installed (from the broadcast and the installer callback, so skip repeats). */
     fun onInstalled(ctx: Context, pkg: String) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val prev = lastHandled.put(pkg, now)
+        if (prev != null && now - prev < 5_000) return
+        // A browser we manage just got installed: give it the website rules right away.
+        if (BrowserPolicy.BROWSERS.any { it.first == pkg }) runCatching { BrowserPolicy.apply(ctx) }
         if (browsersOnly(ctx) && isForbiddenBrowser(ctx, pkg)) {
             remove(ctx, pkg)
             ContextCompat.getMainExecutor(ctx).execute {
@@ -260,7 +267,36 @@ object DeviceOwner {
         runCatching { com.myassistant.app.reading.Reading.offerInstead(ctx) }
     }
 
-    /** Listens for installs while the app's services are running. */
+    @Volatile private var watching = false
+
+    /**
+     * Watches installs for the whole app process (not only while the screen service runs), so a blocked
+     * app is hidden and removed the moment it finishes installing. Two sources, whichever comes first:
+     * the installer's own "session finished" callback and the system's "package added" broadcast.
+     */
+    fun watchInstalls(ctx: Context) {
+        if (watching) return
+        watching = true
+        val app = ctx.applicationContext
+        runCatching { registerInstallWatcher(app) }
+        runCatching {
+            val installer = app.packageManager.packageInstaller
+            val pkgOf = java.util.concurrent.ConcurrentHashMap<Int, String>()
+            fun learn(id: Int) { runCatching { installer.getSessionInfo(id)?.appPackageName }.getOrNull()?.let { pkgOf[id] = it } }
+            installer.registerSessionCallback(object : android.content.pm.PackageInstaller.SessionCallback() {
+                override fun onCreated(sessionId: Int) = learn(sessionId)
+                override fun onBadgingChanged(sessionId: Int) = learn(sessionId)
+                override fun onActiveChanged(sessionId: Int, active: Boolean) = learn(sessionId)
+                override fun onProgressChanged(sessionId: Int, progress: Float) { if (!pkgOf.containsKey(sessionId)) learn(sessionId) }
+                override fun onFinished(sessionId: Int, success: Boolean) {
+                    val pkg = pkgOf.remove(sessionId) ?: return
+                    if (success) Thread { runCatching { onInstalled(app, pkg) } }.start()
+                }
+            }, android.os.Handler(android.os.Looper.getMainLooper()))
+        }
+    }
+
+    /** Listens for installs while the given context is alive. */
     fun registerInstallWatcher(ctx: Context): BroadcastReceiver {
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context, i: Intent) {

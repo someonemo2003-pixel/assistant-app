@@ -28,7 +28,7 @@ class ScreenService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = WeakReference(this)
-        installWatcher = runCatching { com.myassistant.app.admin.DeviceOwner.registerInstallWatcher(this) }.getOrNull()
+        runCatching { com.myassistant.app.admin.DeviceOwner.watchInstalls(applicationContext) } // app-wide, once
         runCatching { com.myassistant.app.admin.DeviceOwner.enforce(applicationContext) }
     }
 

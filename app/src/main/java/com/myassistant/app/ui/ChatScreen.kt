@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
@@ -197,6 +198,8 @@ fun ChatScreen(vm: AppViewModel) {
                                 onClick = { menuOpen = false; vm.screen = Screen.Memory })
                             DropdownMenuItem(text = { Text("البرامج المحظورة") }, leadingIcon = { Icon(Icons.Filled.Lock, null) },
                                 onClick = { menuOpen = false; vm.runCommand("/blockapps") })
+                            DropdownMenuItem(text = { Text("المتصفح والمواقع") }, leadingIcon = { Icon(Icons.Filled.Language, null) },
+                                onClick = { menuOpen = false; vm.runCommand("/extension") })
                         }
                     }
                 },
@@ -469,6 +472,7 @@ private fun SlashSuggestions(input: String, onPick: (String) -> Unit) {
                         when (c.command) {
                             "/blockapps" -> Icons.Filled.Lock
                             "/update" -> Icons.Filled.Refresh
+                            "/extension" -> Icons.Filled.Language
                             else -> Icons.Filled.Edit
                         },
                         null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp),

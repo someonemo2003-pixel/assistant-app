@@ -6,7 +6,8 @@ import org.junit.Test
 
 class SlashCommandsTest {
     @Test fun suggestsWhileTyping() {
-        assertEquals(2, SlashCommands.matching("/").size)
+        assertEquals(3, SlashCommands.matching("/").size)
+        assertEquals("/extension", SlashCommands.matching("/ext").first().command)
         assertEquals("/blockapps", SlashCommands.matching("/blo").first().command)
         assertTrue(SlashCommands.matching("/xyz").isEmpty())
         assertTrue(SlashCommands.matching("ازيك").isEmpty())
