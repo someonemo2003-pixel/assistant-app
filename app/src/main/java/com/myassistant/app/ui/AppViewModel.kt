@@ -184,6 +184,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "/models" -> modelPickerRequest = true
             "/blockapps" -> { screen = Screen.BlockApps; loadApps() }
             "/extension", "/browser", "/sites" -> screen = Screen.Browser
+            "/tasks" -> { setupSection = "tasks"; screen = Screen.Settings }
             "/memory" -> screen = Screen.Memory
             "/learned" -> screen = Screen.Learned
             "/permissions" -> screen = Screen.Permissions

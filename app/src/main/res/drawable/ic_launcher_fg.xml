@@ -1,19 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Nova: a crescent moon in Google's colours. -->
+<!-- Nova: a crescent moon in Google's four colours, each part one solid colour (no blending). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
     <group android:pivotX="54" android:pivotY="54" android:scaleX="1.18" android:scaleY="1.18" android:translateX="2">
-        <path android:pathData="M52.08,32.08 A22.0,22.0 0 1,0 75.27,59.62 A18.0,18.0 0 0,1 52.08,32.08 Z">
-            <aapt:attr name="android:fillColor">
-                <gradient android:type="sweep" android:centerX="54" android:centerY="54">
-                    <item android:offset="0" android:color="#FF4285F4" />
-                    <item android:offset="0.25" android:color="#FF34A853" />
-                    <item android:offset="0.5" android:color="#FFFBBC04" />
-                    <item android:offset="0.75" android:color="#FFEA4335" />
-                    <item android:offset="1" android:color="#FF4285F4" />
-                </gradient>
-            </aapt:attr>
-        </path>
+        <clip-path android:pathData="M52.08,32.08 A22.0,22.0 0 1,0 75.27,59.62 A18.0,18.0 0 0,1 52.08,32.08 Z" />
+        <path android:fillColor="#FFEA4335" android:pathData="M54,54 L48.43,14.39 L29.38,22.47 L16.92,38.99 Z" />
+        <path android:fillColor="#FFFBBC04" android:pathData="M54,54 L17.14,38.47 L14.47,60.14 L23.58,79.98 Z" />
+        <path android:fillColor="#FF34A853" android:pathData="M54,54 L23.23,79.55 L41.23,91.91 L63.03,92.97 Z" />
+        <path android:fillColor="#FF4285F4" android:pathData="M54,54 L62.49,93.09 L80.88,83.62 L92.09,66.23 Z" />
     </group>
 </vector>

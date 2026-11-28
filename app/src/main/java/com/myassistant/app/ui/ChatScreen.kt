@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
@@ -473,6 +474,7 @@ private fun SlashSuggestions(input: String, onPick: (String) -> Unit) {
                             "/blockapps" -> Icons.Filled.Lock
                             "/update" -> Icons.Filled.Refresh
                             "/extension" -> Icons.Filled.Language
+                            "/tasks" -> Icons.Filled.CheckCircle
                             else -> Icons.Filled.Edit
                         },
                         null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(20.dp),

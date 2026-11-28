@@ -125,9 +125,9 @@ class OpenSetupTool : Tool {
     override val title = "فتح شاشة"
     override val description =
         "Open a small screen in Nova when something can't be done by chat: 'providers' (add an AI provider / paste an API key — " +
-            "keys must NEVER be typed in chat), 'gmail' (Gmail address + app password), 'backup' (save/restore a backup file), " +
+            "keys must NEVER be typed in chat), 'gmail' (Gmail address + app password), 'backup' (save/restore a backup file), 'tasks' (connect Google Tasks), " +
             "'permissions', 'learned' (commands Nova learned), 'data' (memory, expenses, reminders), 'chats'."
-    override val parameters = Schema.obj("section" to Schema.string("providers | gmail | backup | permissions | learned | data | chats"), required = listOf("section"))
+    override val parameters = Schema.obj("section" to Schema.string("providers | gmail | backup | tasks | permissions | learned | data | chats"), required = listOf("section"))
     override suspend fun execute(args: JSONObject, ctx: ToolContext): String {
         val s = args.str("section").lowercase().ifBlank { "providers" }
         UiRequests.open(s)

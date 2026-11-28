@@ -7,6 +7,7 @@ object SlashCommands {
     val all = listOf(
         Command("/blockapps", "البرامج المحظورة"),
         Command("/extension", "المتصفح والمواقع"),
+        Command("/tasks", "Google Tasks"),
         Command("/update", "شوف فيه تحديث"),
     )
 
