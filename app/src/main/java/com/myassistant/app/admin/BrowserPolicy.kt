@@ -37,6 +37,51 @@ object BrowserPolicy {
     fun noIncognito(ctx: Context) = prefs(ctx).getBoolean("no_incognito", false)
     fun safeSearch(ctx: Context) = prefs(ctx).getBoolean("safe_search", false)
     fun youtubeRestricted(ctx: Context) = prefs(ctx).getBoolean("yt_restrict", false)
+    fun adBlock(ctx: Context) = prefs(ctx).getBoolean("ad_block", false)
+    fun adBlockStatus(ctx: Context) = prefs(ctx).getString("ad_block_status", "").orEmpty()
+
+    /** Ad blocker for the whole phone: the device's Private DNS set to AdGuard's public ad-blocking DNS. */
+    const val AD_DNS = "dns.adguard-dns.com"
+
+    /** Ad and tracker hosts Nova's own browser never loads (also covered by the DNS when it's on). */
+    val AD_HOSTS = listOf(
+        "doubleclick.net", "googlesyndication.com", "googleadservices.com", "adservice.google.com", "googletagservices.com",
+        "adnxs.com", "taboola.com", "outbrain.com", "criteo.com", "criteo.net", "pubmatic.com", "rubiconproject.com",
+        "amazon-adsystem.com", "adsrvr.org", "openx.net", "smartadserver.com", "moatads.com", "scorecardresearch.com",
+        "popads.net", "popcash.net", "propellerads.com", "mgid.com", "exoclick.com", "adsterra.com", "onclickads.net",
+        "applovin.com", "unityads.unity3d.com", "adcolony.com", "inmobi.com", "yieldmo.com", "media.net",
+    )
+
+    fun isAdHost(host: String): Boolean {
+        val h = host.lowercase()
+        return AD_HOSTS.any { h == it || h.endsWith(".$it") }
+    }
+
+    /** Applies the phone-wide ad blocker (Android 10+, device owner). Runs off the main thread; result saved for the UI. */
+    fun applyAdBlock(ctx: Context) {
+        val app = ctx.applicationContext
+        Thread {
+            val msg = when {
+                android.os.Build.VERSION.SDK_INT < 29 -> "محتاج أندرويد 10 أو أحدث"
+                !DeviceOwner.isOwner(app) -> "التحكم الكامل مش شغال"
+                else -> runCatching {
+                    val dpm = app.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                    val admin = DeviceOwner.admin(app)
+                    if (adBlock(app)) {
+                        when (dpm.setGlobalPrivateDnsModeSpecifiedHost(admin, AD_DNS)) {
+                            android.app.admin.DevicePolicyManager.PRIVATE_DNS_SET_NO_ERROR -> "شغال على كل الموبايل"
+                            android.app.admin.DevicePolicyManager.PRIVATE_DNS_SET_ERROR_HOST_NOT_SERVING -> "خادم مانع الإعلانات مش بيرد دلوقتي، جرّب تاني وإنت متصل بالنت"
+                            else -> "ما اشتغلش"
+                        }
+                    } else {
+                        dpm.setGlobalPrivateDnsModeOpportunistic(admin)
+                        "مقفول"
+                    }
+                }.getOrElse { "ما اشتغلش: ${it.message}" }
+            }
+            prefs(app).edit().putString("ad_block_status", msg).apply()
+        }.start()
+    }
 
     /** "https://www.TikTok.com/" -> "tiktok.com"; null when it isn't a site. */
     fun normalize(input: String): String? {
@@ -60,7 +105,7 @@ object BrowserPolicy {
 
     fun setSwitch(ctx: Context, key: String, on: Boolean) {
         prefs(ctx).edit().putBoolean(key, on).commit()
-        apply(ctx)
+        if (key == "ad_block") applyAdBlock(ctx) else apply(ctx)
     }
 
     fun isInstalled(ctx: Context, pkg: String) = runCatching { ctx.packageManager.getApplicationInfo(pkg, 0); true }.getOrDefault(false)

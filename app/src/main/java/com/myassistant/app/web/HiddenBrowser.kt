@@ -83,6 +83,11 @@ object HiddenBrowser {
                 }
                 lastUrl = url
             }
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                val host = request.url.host ?: return null
+                // Ads and trackers: answer with an empty response instead of loading them.
+                return if (BrowserPolicy.isAdHost(host)) android.webkit.WebResourceResponse("text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0))) else null
+            }
             override fun onPageFinished(view: WebView, url: String) { lastUrl = url; pageDone?.complete(Unit) }
         }
         // Lay it out off screen so pages render as on a phone.

@@ -140,6 +140,8 @@ fun BrowserScreen(vm: AppViewModel) {
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainer),
                 ) {
                     listOf(
+                        Triple("ad_block", "مانع الإعلانات", "يمنع الإعلانات في كل البرامج والمتصفحات عن طريق AdGuard DNS" +
+                            BrowserPolicy.adBlockStatus(ctx).let { if (it.isNotBlank() && BrowserPolicy.adBlock(ctx)) " · $it" else "" }) to BrowserPolicy.adBlock(ctx),
                         Triple("no_incognito", "اقفل التصفح المتخفي", "علشان المواقع المحظورة متتفتحش من Incognito أو InPrivate") to BrowserPolicy.noIncognito(ctx),
                         Triple("safe_search", "البحث الآمن في جوجل", "يخفي النتايج الخادشة من البحث") to BrowserPolicy.safeSearch(ctx),
                         Triple("yt_restrict", "يوتيوب الوضع المقيّد", "يخفي الفيديوهات غير المناسبة على يوتيوب من المتصفح") to BrowserPolicy.youtubeRestricted(ctx),

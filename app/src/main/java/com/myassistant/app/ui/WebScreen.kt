@@ -3,6 +3,11 @@ package com.myassistant.app.ui
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -86,36 +91,24 @@ fun WebScreen(vm: AppViewModel) {
         }
     }
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text("متصفح Nova") },
-                navigationIcon = { IconButton(onClick = { vm.screen = Screen.Chat }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") } },
-                actions = { IconButton(onClick = { web.reload() }) { Icon(Icons.Filled.Refresh, "تحديث") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-            )
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            Text(
-                "تسجيلات الدخول هنا خاصة بـ Nova، ومنفصلة عن Chrome. سجّل دخولك بنفسك مرة، وبعدها Nova يقدر يستخدم الموقع في الخلفية.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    OutlinedTextField(
+    // One slim bar like a normal browser: back · address · reload. The page gets the rest of the screen.
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { vm.screen = Screen.Chat }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
+                    androidx.compose.foundation.text.BasicTextField(
                         value = address, onValueChange = { address = it }, singleLine = true,
-                        placeholder = { Text("example.com") }, shape = RoundedCornerShape(24.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(onGo = { go(address) }),
-                        trailingIcon = {
-                            IconButton(onClick = { go(address) }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "افتح") }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f)
+                            .clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                     )
-                }
+                IconButton(onClick = { web.reload() }) { Icon(Icons.Filled.Refresh, "تحديث") }
             }
             notice?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
             AndroidView(
@@ -128,6 +121,5 @@ fun WebScreen(vm: AppViewModel) {
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-        }
     }
 }
